@@ -144,6 +144,7 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .r-one { --c: var(--txt); } .r-lz { --c: var(--exp); } .r-tz { --c: var(--pay); }
 .r-frac { --c: var(--mant); }
 .r-pt { --c: var(--prefix); } .r-ps { --c: var(--sign); } .r-pu { --c: var(--exp); } .r-pg { --c: var(--mant); } .r-po { --c: var(--int); }
+.r-ts { --c: var(--exp); } .r-mid { --c: var(--prefix); } .r-seq { --c: var(--mant); }
 
 /* hover-to-isolate a field's bits */
 .bytes[data-hl] .bit { opacity: .18; }
@@ -153,7 +154,8 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .bytes[data-hl="cr"] .r-cr, .bytes[data-hl="cg"] .r-cg, .bytes[data-hl="cb"] .r-cb, .bytes[data-hl="ca"] .r-ca,
 .bytes[data-hl="oui"] .r-oui, .bytes[data-hl="nic"] .r-nic, .bytes[data-hl="flag"] .r-flag,
 .bytes[data-hl="one"] .r-one, .bytes[data-hl="lz"] .r-lz, .bytes[data-hl="tz"] .r-tz, .bytes[data-hl="frac"] .r-frac,
-.bytes[data-hl="pt"] .r-pt, .bytes[data-hl="ps"] .r-ps, .bytes[data-hl="pu"] .r-pu, .bytes[data-hl="pg"] .r-pg, .bytes[data-hl="po"] .r-po { opacity: 1; }
+.bytes[data-hl="pt"] .r-pt, .bytes[data-hl="ps"] .r-ps, .bytes[data-hl="pu"] .r-pu, .bytes[data-hl="pg"] .r-pg, .bytes[data-hl="po"] .r-po,
+.bytes[data-hl="ts"] .r-ts, .bytes[data-hl="mid"] .r-mid, .bytes[data-hl="seq"] .r-seq { opacity: 1; }
 
 .stream-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .hexrow { display: flex; align-items: center; gap: 8px; flex: 1 1 300px; min-width: 0; }
@@ -253,6 +255,9 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--alpha); }
 .c64ch { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 /* bit fields deck */
+.c-ts { color: var(--exp); } .c-mid { color: var(--prefix); } .c-seq { color: var(--mant); }
+.fieldbar { display: flex; height: 26px; border-radius: 7px; overflow: hidden; margin: 2px 0 12px; font: 600 11px/26px var(--mono); }
+.fieldbar > div { text-align: center; color: #0a0d13; white-space: nowrap; overflow: hidden; cursor: default; }
 .c-pt { color: var(--prefix); } .c-ps { color: var(--sign); } .c-pu { color: var(--exp); } .c-pg { color: var(--mant); } .c-po { color: var(--int); }
 .permgrid { display: grid; grid-template-columns: auto repeat(3, minmax(44px, 64px)); gap: 6px 8px; align-items: center; margin: 4px 0 12px; }
 .permgrid .h { font-size: 11.5px; color: var(--muted); text-align: center; }
@@ -580,6 +585,30 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
           </div>
           <p class="hint">Each octal digit is exactly three bits — r = 4, w = 2, x = 1 — which is why permissions are written in octal: 7 = rwx, 5 = r-x, 4 = r--. The leading digit holds the special bits: setuid (4, run as the file’s owner, e.g. <code>passwd</code>), setgid (2) and sticky (1, on <code>/tmp</code>: only a file’s owner may delete it).</p>
         </article>
+        <article class="card" data-lens="snow">
+          <div class="card-h"><h3>Snowflake ID</h3><span class="tag">64-bit · bytes B0–B7 · Twitter / X, Discord</span><span class="badge" id="snow-badge"></span></div>
+          <div class="fieldbar">
+            <div style="width:calc(1 / 64 * 100%);background:var(--sign)" data-hl="sign" title="Sign bit (always 0)"></div>
+            <div style="width:calc(41 / 64 * 100%);background:var(--exp)" data-hl="ts">timestamp · 41</div>
+            <div style="width:calc(10 / 64 * 100%);background:var(--prefix)" data-hl="mid">machine · 10</div>
+            <div style="width:calc(12 / 64 * 100%);background:var(--mant)" data-hl="seq">seq · 12</div>
+          </div>
+          <label class="field"><span class="lab">ID (decimal, as it appears in URLs)</span><input type="text" id="snow-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label>
+          <div class="parts">
+            <div class="part" data-hl="ts"><div class="part-h"><span><i class="sw r-ts"></i>Timestamp</span><em>41 bits · ms since epoch</em></div><code class="pbits c-ts" id="snow-tsb"></code><div class="pval" id="snow-tsv"></div></div>
+            <div class="part" data-hl="mid"><div class="part-h"><span><i class="sw r-mid"></i>Machine</span><em>10 bits · 5 + 5</em></div><code class="pbits c-mid" id="snow-midb"></code><div class="pval" id="snow-midv"></div></div>
+            <div class="part" data-hl="seq"><div class="part-h"><span><i class="sw r-seq"></i>Sequence</span><em>12 bits</em></div><code class="pbits c-seq" id="snow-seqb"></code><div class="pval" id="snow-seqv"></div></div>
+          </div>
+          <div class="kv">
+            <span>Twitter / X</span><code id="snow-tw"></code>
+            <span>Discord</span><code id="snow-dc"></code>
+          </div>
+          <div class="pickrow" style="flex-wrap:wrap">
+            <button type="button" class="btn" data-snow-now="tw">New Twitter ID now</button>
+            <button type="button" class="btn" data-snow-now="dc">New Discord ID now</button>
+          </div>
+          <p class="hint">Snowflake IDs let many servers create unique IDs without talking to each other: the time comes first so IDs sort by creation time, the machine field keeps servers apart, and the sequence counts IDs made in the same millisecond (up to 4,096). Twitter counts from 2010-11-04, Discord from 2015-01-01. 41 bits of milliseconds last about 69.7 years — Twitter’s IDs run out in 2080.</p>
+        </article>
       </div>
     </section>
 
@@ -646,8 +675,8 @@ const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
 const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
-const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields' };
-Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields' });
+const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields' };
+Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields' });
 Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
 // display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
 const displayOrder = () => (state.order === 'le') === LITTLE ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -808,6 +837,7 @@ const ROLE_NAMES = {
   prefix: 'UTF-8 marker', bad: 'invalid UTF-8', cont: 'continuation flag', pay: 'varint payload', unused: 'not in view',
   cr: 'red', cg: 'green', cb: 'blue', ca: 'alpha', oui: 'OUI (vendor)', nic: 'device-specific', flag: 'MAC flag bit',
   one: 'set bit', lz: 'leading zero', tz: 'trailing zero', frac: 'fraction bit',
+  ts: 'timestamp', mid: 'machine ID', seq: 'sequence',
   pt: 'file type', ps: 'special bit', pu: 'owner permission', pg: 'group permission', po: 'others permission',
 };
 const LEGENDS = {
@@ -830,6 +860,7 @@ const LEGENDS = {
   b32: [['one', 'Set bits (1s)'], ['lz', 'Leading zeros'], ['tz', 'Trailing zeros'], ['unused', 'Other zeros · outside (B4–B7)']],
   q16: [['sign', 'Sign'], ['int', 'Integer part (15)'], ['frac', 'Fraction (16)'], ['unused', 'Outside (B4–B7)']],
   q15: [['sign', 'Sign'], ['frac', 'Fraction (15)'], ['unused', 'Outside (B2–B7)']],
+  snow: [['sign', 'Sign (always 0)'], ['ts', 'Timestamp (41)'], ['mid', 'Machine (10)'], ['seq', 'Sequence (12)']],
   perm: [['pt', 'File type (4)'], ['ps', 'setuid · setgid · sticky'], ['pu', 'Owner rwx'], ['pg', 'Group rwx'], ['po', 'Others rwx'], ['unused', 'Outside (B2–B7)']],
 };
 
@@ -852,6 +883,7 @@ function roleOf(b, k, d) {
     case 't64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
     case 'ip4': return b < 4 ? 'int' : 'unused';
     case 'mac': return b >= 6 ? 'unused' : b >= 3 ? 'nic' : b === 0 && k < 2 ? 'flag' : 'oui';
+    case 'snow': { const v = valueBit(b, k, 8); return v === 63 ? 'sign' : v >= 22 ? 'ts' : v >= 12 ? 'mid' : 'seq'; }
     case 'perm': {
       if (b >= 2) return 'unused';
       const v = valueBit(b, k, 2);
@@ -896,6 +928,7 @@ function byteNote(b, d) {
     case 'q16': return b < 4 ? range(4) : '—';
     case 'q15': return b < 2 ? range(2) : '—';
     case 'perm': return b < 2 ? range(2) : '—';
+    case 'snow': return range(8);
     case 'b32': return b < 4 ? range(4) : '—';
   }
 }
@@ -1283,6 +1316,7 @@ function update(src = null) {
   renderFixed('q16', src);
   renderFixed('q15', src);
   renderPerm(src);
+  renderSnow(src);
   renderLens();
 }
 
@@ -1927,6 +1961,44 @@ function bindPerm() {
   });
 }
 
+/* ═══════════ Snowflake IDs ═══════════ */
+const SNOW_EPOCHS = { tw: 1288834974657n, dc: 1420070400000n };
+const makeSnow = (epoch, mid, seq) => ((BigInt(Date.now()) - epoch) << 22n) | (mid << 12n) | seq;
+function snowParts(x) { return { ts: (x >> 22n) & ((1n << 41n) - 1n), mid: (x >> 12n) & 1023n, seq: x & 4095n, sign: x >> 63n }; }
+
+function renderSnow(src) {
+  const x = u64[0], { ts, mid, seq, sign } = snowParts(x);
+  setVal($('snow-in'), x.toString(), src);
+  const badge = $('snow-badge');
+  badge.className = 'badge ' + (sign ? 'k-bad' : 'k-ok');
+  badge.textContent = sign ? 'invalid: sign bit set' : 'valid';
+  $('snow-tsb').textContent = bin(ts, 41);
+  $('snow-tsv').innerHTML = `${fmtBig(ts)} ms ≈ ${(Number(ts) / 31557600000).toFixed(2)} years after the epoch`;
+  $('snow-midb').textContent = bin(mid, 10);
+  $('snow-midv').innerHTML = `${mid} = ${mid >> 5n} · ${mid & 31n} <span class="c-muted">(Twitter: datacenter · worker; Discord: worker · process)</span>`;
+  $('snow-seqb').textContent = bin(seq, 12);
+  $('snow-seqv').innerHTML = `${seq} <span class="c-muted">— ID number ${seq + 1n} made in that millisecond on that machine</span>`;
+  const when = ep => { const ms = Number(ts + ep); return `${fmtUTC(ms, true)} <span class="c-muted">(${fmtRel(ms)})</span>`; };
+  $('snow-tw').innerHTML = when(SNOW_EPOCHS.tw);
+  $('snow-dc').innerHTML = when(SNOW_EPOCHS.dc);
+}
+
+function bindSnow() {
+  bind('snow-in', s => {
+    const t = s.trim().replace(/[_,\s]/g, '');
+    if (!t) return null;
+    if (!/^\d+$/.test(t)) throw new Error('Expected a positive decimal ID');
+    const v = BigInt(t);
+    if (v > (1n << 63n) - 1n) throw new Error('Larger than 63 bits — not a valid Snowflake');
+    return v;
+  }, v => { u64[0] = v; });
+  document.querySelectorAll('[data-snow-now]').forEach(b => b.addEventListener('click', () => {
+    const { mid, seq } = snowParts(u64[0]);
+    u64[0] = makeSnow(SNOW_EPOCHS[b.dataset.snowNow], mid, seq);
+    update();
+  }));
+}
+
 /* ═══════════ Toolbar, presets, lens interaction ═══════════ */
 const OPS = {
   zero: () => u8.fill(0),
@@ -2038,6 +2110,11 @@ const PRESETS = [
     ['drwxrwxrwt 1777 (/tmp, sticky)', () => { u8.fill(0); u16[0] = 0o041777; }, 'perm'],
     ['-rwsr-xr-x 4755 (passwd, setuid)', () => { u8.fill(0); u16[0] = 0o104755; }, 'perm'],
     ['lrwxrwxrwx 777 (symlink)', () => { u8.fill(0); u16[0] = 0o120777; }, 'perm'],
+  ]],
+  ['snowflake', [
+    ['Discord docs example 175928847299117063', () => { u64[0] = 175928847299117063n; }, 'snow'],
+    ['Twitter ID made now', () => { u64[0] = makeSnow(SNOW_EPOCHS.tw, 0n, 0n); }, 'snow'],
+    ['Last Twitter timestamp (2080)', () => { u64[0] = ((1n << 41n) - 1n) << 22n; }, 'snow'],
   ]],
   ['color', [
     ['RGBA: orange + half-transparent teal', () => { state.colorLayout = 'RGBA'; u32[0] = 0xFF8C1AFF; u32[1] = 0x1ABC9C80; }, 'c32'],
@@ -2171,6 +2248,7 @@ bindBits();
 bindFixed();
 buildPerm();
 bindPerm();
+bindSnow();
 setupControls();
 u64[0] = 0x0123456789ABCDEFn;
 update();

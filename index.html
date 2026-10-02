@@ -143,6 +143,7 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .r-oui { --c: var(--exp); } .r-nic { --c: var(--int); } .r-flag { --c: var(--sign); }
 .r-one { --c: var(--txt); } .r-lz { --c: var(--exp); } .r-tz { --c: var(--pay); }
 .r-frac { --c: var(--mant); }
+.r-g0 { --c: var(--txt); } .r-g1 { --c: var(--exp); }
 .r-pt { --c: var(--prefix); } .r-ps { --c: var(--sign); } .r-pu { --c: var(--exp); } .r-pg { --c: var(--mant); } .r-po { --c: var(--int); }
 .r-ts { --c: var(--exp); } .r-mid { --c: var(--prefix); } .r-seq { --c: var(--mant); }
 .r-rop { --c: var(--prefix); } .r-rrd { --c: var(--exp); } .r-rf3 { --c: var(--sign); } .r-rs1 { --c: var(--mant); } .r-rs2 { --c: var(--pay); } .r-rf7 { --c: var(--int); } .r-rimm { --c: var(--txt); }
@@ -155,7 +156,7 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .bytes[data-hl="bad"] .r-bad, .bytes[data-hl="cont"] .r-cont, .bytes[data-hl="pay"] .r-pay,
 .bytes[data-hl="cr"] .r-cr, .bytes[data-hl="cg"] .r-cg, .bytes[data-hl="cb"] .r-cb, .bytes[data-hl="ca"] .r-ca,
 .bytes[data-hl="oui"] .r-oui, .bytes[data-hl="nic"] .r-nic, .bytes[data-hl="flag"] .r-flag,
-.bytes[data-hl="one"] .r-one, .bytes[data-hl="lz"] .r-lz, .bytes[data-hl="tz"] .r-tz, .bytes[data-hl="frac"] .r-frac,
+.bytes[data-hl="one"] .r-one, .bytes[data-hl="lz"] .r-lz, .bytes[data-hl="tz"] .r-tz, .bytes[data-hl="frac"] .r-frac, .bytes[data-hl="g0"] .r-g0, .bytes[data-hl="g1"] .r-g1,
 .bytes[data-hl="pt"] .r-pt, .bytes[data-hl="ps"] .r-ps, .bytes[data-hl="pu"] .r-pu, .bytes[data-hl="pg"] .r-pg, .bytes[data-hl="po"] .r-po,
 .bytes[data-hl="ts"] .r-ts, .bytes[data-hl="mid"] .r-mid, .bytes[data-hl="seq"] .r-seq,
 .bytes[data-hl="rop"] .r-rop, .bytes[data-hl="rrd"] .r-rrd, .bytes[data-hl="rf3"] .r-rf3, .bytes[data-hl="rs1"] .r-rs1, .bytes[data-hl="rs2"] .r-rs2, .bytes[data-hl="rf7"] .r-rf7, .bytes[data-hl="rimm"] .r-rimm,
@@ -276,6 +277,13 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--alpha); }
 }
 .pbtn.on { background: var(--c); border-color: var(--c); color: #0a0d13; }
 .lsline { font: 600 22px/1.3 var(--mono); letter-spacing: .04em; }
+
+/* base64 */
+.c-g0 { color: var(--txt); } .c-g1 { color: var(--exp); }
+.b64row td { vertical-align: middle; }
+.b64chars { display: inline-flex; gap: 4px; }
+.b64chars span { min-width: 1.6em; text-align: center; padding: 1px 4px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--border); font-weight: 650; }
+.b64chars span.pad { color: var(--faint); }
 
 /* fixed-point deck */
 .c-frac { color: var(--mant); }
@@ -483,6 +491,19 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
             <span>As UTF-16BE</span><code id="u16-be"></code>
           </div>
           <p class="hint">UTF-16 stores most characters in one 16-bit code unit. Characters beyond U+FFFF — most emoji — need two: a <b>surrogate pair</b>, a high surrogate (110110…) followed by a low surrogate (110111…) that together carry 20 bits. JavaScript strings are UTF-16, which is why <code>"😀".length === 2</code>. A surrogate without its partner is invalid.</p>
+        </article>
+        <article class="card" data-lens="b64t">
+          <div class="card-h"><h3>Base64</h3><span class="tag">3 bytes → 4 characters of 6 bits each</span><span class="badge" id="base64-badge"></span></div>
+          <div class="fields"><label class="field"><span class="lab">Base64 (standard or URL-safe; padding optional)</span><input type="text" id="base64-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label></div>
+          <div class="tablewrap"><table>
+            <thead><tr><th>Bytes</th><th>Bits, regrouped into 6s</th><th>Characters</th></tr></thead>
+            <tbody id="base64-rows"></tbody>
+          </table></div>
+          <div class="kv">
+            <span>URL-safe</span><code id="base64-url"></code>
+            <span>Size</span><code id="base64-size"></code>
+          </div>
+          <p class="hint">Base64 turns any bytes into plain text using 64 safe characters (A–Z, a–z, 0–9, + and /), so binary data can travel through email, JSON, data: URLs and JWTs. Every 3 bytes (24 bits) become 4 characters of 6 bits, making the text a third larger; a short final group is filled out with zero bits and “=” padding. The URL-safe variant swaps + and / for - and _.</p>
         </article>
       </div>
     </section>
@@ -712,8 +733,8 @@ const u16 = new Uint16Array(buffer);
 const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
-const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', u16: 'text', c32: 'color', c64: 'color', c565: 'color' };
-const TAB_OF = { u16: 'text', c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields', rv: 'fields' };
+const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', u16: 'text', b64t: 'text', c32: 'color', c64: 'color', c565: 'color' };
+const TAB_OF = { u16: 'text', b64t: 'text', c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields', rv: 'fields' };
 Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields', rv: 'fields' });
 Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
 // display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
@@ -874,7 +895,7 @@ const ROLE_NAMES = {
   sign: 'sign', exp: 'exponent', mant: 'mantissa', int: 'value bit', txt: 'code-point payload',
   prefix: 'UTF-8 marker', bad: 'invalid UTF-8', cont: 'continuation flag', pay: 'varint payload', unused: 'not in view',
   cr: 'red', cg: 'green', cb: 'blue', ca: 'alpha', oui: 'OUI (vendor)', nic: 'device-specific', flag: 'MAC flag bit',
-  one: 'set bit', lz: 'leading zero', tz: 'trailing zero', frac: 'fraction bit',
+  one: 'set bit', lz: 'leading zero', tz: 'trailing zero', frac: 'fraction bit', g0: '6-bit group', g1: '6-bit group',
   ts: 'timestamp', mid: 'machine ID', seq: 'sequence',
   rop: 'opcode', rrd: 'rd (destination register)', rf3: 'funct3', rs1: 'rs1 (source register 1)', rs2: 'rs2 (source register 2)', rf7: 'funct7', rimm: 'immediate',
   fy: 'year − 1980', fm: 'month', fd: 'day', fh: 'hour', fn: 'minute', fs: 'seconds ÷ 2',
@@ -888,6 +909,7 @@ const LEGENDS = {
   i32: [['sign', 'Sign bit (2³¹ weight)'], ['int', 'Value bits'], ['unused', 'Outside i32 (B4–B7)']],
   i64: [['sign', 'Sign bit (2⁶³ weight)'], ['int', 'Value bits']],
   text: [['prefix', 'UTF-8 marker bits (0 / 110 / 1110 / 11110 / 10)'], ['txt', 'Code-point payload'], ['bad', 'Invalid byte']],
+  b64t: [['g0', '6-bit group'], ['g1', 'next 6-bit group'], ['unused', 'Not encoded (trailing zero bytes)']],
   u16: [['prefix', 'Surrogate marker (110110 / 110111)'], ['txt', 'Code-point bits'], ['bad', 'Unpaired surrogate']],
   varint: [['cont', 'Continuation (MSB)'], ['pay', '7-bit payload'], ['unused', 'Not in stream']],
   c32: [['cr', 'Red'], ['cg', 'Green'], ['cb', 'Blue'], ['ca', 'Alpha'], ['', '8 bits each · 2 pixels']],
@@ -916,6 +938,11 @@ function roleOf(b, k, d) {
     case 'f16': case 'bf16': { if (b >= 2) return 'unused'; const v = valueBit(b, k, 2), M = state.lens === 'f16' ? 10 : 7; return v === 15 ? 'sign' : v >= M ? 'exp' : 'mant'; }
     case 'i32': { if (b >= 4) return 'unused'; return valueBit(b, k, 4) === 31 ? 'sign' : 'int'; }
     case 'i64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
+    case 'b64t': {
+      if (b >= d.b64len) return 'unused';
+      const pos = b * 8 + (7 - k); // bits are read most-significant first, byte by byte
+      return Math.floor(pos / 6) % 2 ? 'g1' : 'g0';
+    }
     case 'u16': {
       const kind = d.utf16.kinds[b >> 1], idx = (b & 1) * 8 + k; // bit within the little-endian code unit
       if (kind === 'bad') return 'bad';
@@ -968,6 +995,7 @@ function byteNote(b, d) {
     case 'f32': case 'i32': return b < 4 ? range(4) : '—';
     case 'f64': case 'i64': return range(8);
     case 'f16': case 'bf16': return b < 2 ? range(2) : '—';
+    case 'b64t': return b < d.b64len ? `group ${Math.floor(b / 3) + 1}` : '—';
     case 'u16': return `unit ${b >> 1} ${b & 1 ? 'hi' : 'lo'}`;
     case 'text': {
       const x = u8[b], k = d.utf8.info[b].kind;
@@ -1357,7 +1385,7 @@ function renderHexAll(src) {
   $('hexLab').textContent = state.order === 'be' ? 'Bytes (hex, MSB first)' : 'Bytes (hex, LSB first)';
 }
 
-function derive() { return { utf8: decodeUtf8(u8), varint: decodeVarint(u8), b64: bitInfo(u64[0], 64), b32: bitInfo(BigInt(u32[0]), 32), rv: rvDecode(rvRead()), utf16: decodeUtf16() }; }
+function derive() { return { utf8: decodeUtf8(u8), varint: decodeVarint(u8), b64: bitInfo(u64[0], 64), b32: bitInfo(BigInt(u32[0]), 32), rv: rvDecode(rvRead()), utf16: decodeUtf16(), b64len: usedEnd() }; }
 
 function update(src = null) {
   const d = derive();
@@ -1370,6 +1398,7 @@ function update(src = null) {
   renderInt(64, src);
   renderText(d, src);
   renderUtf16(d, src);
+  renderBase64(d, src);
   renderVarint(d, src);
   renderColor(src);
   renderTime(src);
@@ -2452,6 +2481,57 @@ function bindUtf16() {
   bind('u16-in', parseUtf16, units => { u8.fill(0); units.forEach((u, i) => { u8[2 * i] = u & 255; u8[2 * i + 1] = u >> 8; }); });
 }
 
+/* ═══════════ Base64 ═══════════ */
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function toBase64(bytes) {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const n = (bytes[i] << 16) | ((bytes[i + 1] ?? 0) << 8) | (bytes[i + 2] ?? 0), have = Math.min(3, bytes.length - i);
+    for (let j = 0; j < 4; j++) out += j <= have ? B64[(n >> (18 - 6 * j)) & 63] : '=';
+  }
+  return out;
+}
+function fromBase64(str) {
+  const t = str.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+  if (!/^[A-Za-z0-9+/]*$/.test(t)) throw new Error('Only A–Z, a–z, 0–9, + / (or - _) and = padding are allowed');
+  if (t.length % 4 === 1) throw new Error('A single leftover character can’t encode a whole byte');
+  const out = [];
+  let acc = 0, bits = 0;
+  for (const c of t) {
+    acc = (acc << 6) | B64.indexOf(c); bits += 6;
+    if (bits >= 8) { bits -= 8; out.push((acc >> bits) & 255); }
+  }
+  if (out.length > 8) throw new Error(`${out.length} bytes — the buffer holds 8`);
+  return out;
+}
+
+function renderBase64(d, src) {
+  const n = d.b64len, bytes = Array.from(u8.subarray(0, n)), enc = toBase64(bytes);
+  setVal($('base64-in'), enc, src);
+  const badge = $('base64-badge');
+  badge.className = 'badge k-ok';
+  badge.textContent = `${n} byte${n === 1 ? '' : 's'} → ${enc.length} chars`;
+  const rows = [];
+  for (let i = 0; i < n; i += 3) {
+    const grp = bytes.slice(i, i + 3), have = grp.length;
+    const bitsStr = grp.map(x => bin(x, 8)).join('') + '0'.repeat((3 - have) * 8);
+    const chunks = [0, 1, 2, 3].map(j => {
+      const c6 = bitsStr.slice(6 * j, 6 * j + 6), real = Math.max(0, Math.min(6, have * 8 - 6 * j)), role = (i / 3 * 4 + j) % 2 ? 'g1' : 'g0';
+      if (j > have) return { html: `<span class="c-muted">——————</span>`, ch: '=', pad: true, role };
+      return { html: `<span class="c-${role}" data-hl="${role}">${c6.slice(0, real)}</span><span class="c-muted">${c6.slice(real)}</span>`, ch: B64[parseInt(c6, 2)], v: parseInt(c6, 2), role };
+    });
+    rows.push(`<tr class="b64row" data-bytes="${i}-${i + have - 1}"><td>${grp.map(hex2).join(' ')}</td><td>${chunks.map(c => c.html).join(' ')}</td>` +
+      `<td><span class="b64chars">${chunks.map(c => `<span class="${c.pad ? 'pad' : `c-${c.role}`}" title="${c.pad ? 'padding' : `${c.v}`}">${c.ch}</span>`).join('')}</span></td></tr>`);
+  }
+  $('base64-rows').innerHTML = rows.join('') || '<tr><td colspan="3" class="empty">All bytes are zero — nothing to encode</td></tr>';
+  $('base64-url').textContent = enc.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') || '—';
+  $('base64-size').textContent = `${n} bytes → 4 × ⌈${n} ÷ 3⌉ = ${enc.length} characters (trailing zero bytes ignored)`;
+}
+
+function bindBase64() {
+  bind('base64-in', s => s.trim() ? fromBase64(s) : null, writeBytes);
+}
+
 /* ═══════════ Toolbar, presets, lens interaction ═══════════ */
 const OPS = {
   zero: () => u8.fill(0),
@@ -2519,6 +2599,9 @@ const PRESETS = [
     ['Q1.15 largest (≈ 0.99997)', () => { u8.fill(0); u16[0] = 0x7FFF; }, 'q15'],
   ]],
   ['text', [
+    ['Base64 "Man" → TWFu', () => writeBytes(utf8Bytes('Man')), 'b64t'],
+    ['Base64 "Hi" → SGk= (padding)', () => writeBytes(utf8Bytes('Hi')), 'b64t'],
+    ['Base64 FB FF BF → +/+/ (URL-safe: -_-_)', () => writeBytes([0xFB, 0xFF, 0xBF]), 'b64t'],
     ['UTF-16 "Hi!"', () => writeUtf16('Hi!'), 'u16'],
     ['UTF-16 "😀" (surrogate pair)', () => writeUtf16('😀'), 'u16'],
     ['UTF-16 "€😀" (one unit + a pair)', () => writeUtf16('€😀'), 'u16'],
@@ -2717,6 +2800,7 @@ buildGrid();
 buildColor();
 bindAll();
 bindUtf16();
+bindBase64();
 bindColor();
 bindSmallFloats();
 bindTime();

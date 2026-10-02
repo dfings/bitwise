@@ -12,6 +12,7 @@ Open `index.html` in a browser. It's a single self-contained file — no build s
 
 - **Integers** — `i32`/`u32` and `i64`/`u64`, with a two's-complement breakdown. Accepts decimal, `0x…`, `0b…` and `0o…`.
 - **Floating point** — IEEE 754 `f32` and `f64`, plus the 16-bit formats `f16` (half precision) and `bf16` (bfloat16): sign, exponent and mantissa, the formula worked through step by step, and the exact stored decimal value. Handles zero, subnormals, infinities and quiet/signaling NaNs.
+- **Fixed point** — Q16.16 (games and graphics) and Q1.15 (audio/DSP): an integer with an implied binary point, split into sign, integer and fraction bits.
 - **Text** — ASCII and UTF-8 side by side, with invalid sequences flagged and non-printable bytes shown as symbols or `\xNN` escapes.
 - **Protobuf varint** — a byte-by-byte decode of the 7-bit groups, plus the ZigZag (`sint64`) reading.
 - **Time** — Unix timestamps: `i32` seconds (with the Year 2038 rollover) and `i64` milliseconds as used by JavaScript `Date`, plus the same `i64` read as seconds, microseconds and nanoseconds.

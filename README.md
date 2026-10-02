@@ -14,6 +14,7 @@ Open `index.html` in a browser. It's a single self-contained file — no build s
 - **Floating point** — IEEE 754 `f32` and `f64`, plus the 16-bit formats `f16` (half precision) and `bf16` (bfloat16): sign, exponent and mantissa, the formula worked through step by step, and the exact stored decimal value. Handles zero, subnormals, infinities and quiet/signaling NaNs.
 - **Text** — ASCII and UTF-8 side by side, with invalid sequences flagged and non-printable bytes shown as symbols or `\xNN` escapes.
 - **Protobuf varint** — a byte-by-byte decode of the 7-bit groups, plus the ZigZag (`sint64`) reading.
+- **Time** — Unix timestamps: `i32` seconds (with the Year 2038 rollover) and `i64` milliseconds as used by JavaScript `Date`, plus the same `i64` read as seconds, microseconds and nanoseconds.
 - **Color** — two 32-bit RGBA pixels (with RGBA / ARGB / ABGR channel order), one 64-bit pixel (RGBA16 or half-float RGBA16F), and four RGB565 pixels.
 
 ## Using it

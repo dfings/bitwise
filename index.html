@@ -235,6 +235,22 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--alpha); }
 .chans { display: flex; flex-wrap: wrap; gap: 2px 10px; font: 12px var(--mono); }
 .chans span { cursor: default; }
 .c64ch { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* time deck */
+.when { margin-bottom: 12px; }
+.when .big { font: 600 20px/1.3 var(--mono); overflow-wrap: anywhere; }
+.when .big.bad { color: var(--bad); font-size: 15px; }
+.timeline { position: relative; height: 48px; margin: 4px 8px 10px; }
+.timeline .track {
+  position: absolute; left: 0; right: 0; top: 16px; height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--sign) 40%, transparent) 0 50%, color-mix(in srgb, var(--int) 40%, transparent) 50% 100%);
+}
+.timeline .tick { position: absolute; top: 11px; width: 2px; height: 16px; background: var(--muted); transform: translateX(-1px); }
+.timeline .tick span { position: absolute; top: 19px; left: 50%; transform: translateX(-50%); font: 10.5px var(--mono); color: var(--faint); white-space: nowrap; }
+.timeline .tick.l span { left: 0; transform: none; }
+.timeline .tick.r span { left: auto; right: 0; transform: none; }
+.timeline .mark { position: absolute; top: 0; width: 0; height: 0; transform: translateX(-7px);
+  border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 11px solid var(--accent); }
 @media (max-width: 520px) { .c64ch { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .c-txt { color: var(--txt); } .c-muted { color: var(--muted); } .c-bad { color: var(--bad); }
 
@@ -307,6 +323,7 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
         <button role="tab" data-tab="bf16">bf16</button>
         <button role="tab" data-tab="text">Text</button>
         <button role="tab" data-tab="varint">Varint</button>
+        <button role="tab" data-tab="time">Time</button>
         <button role="tab" data-tab="color">Color</button>
       </div>
       <div class="seg" id="viewSeg" title="Show only the cards for the current lens, or every card">
@@ -411,6 +428,38 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
       </div>
     </section>
 
+    <!-- Time -->
+    <section class="deck" data-deck="time">
+      <div class="deck-h"><h2>Time</h2><p>Unix timestamps — counted from the epoch, 1970-01-01 00:00:00 UTC</p></div>
+      <div class="pair">
+        <article class="card" data-lens="t32">
+          <div class="card-h"><h3>Unix seconds · i32</h3><span class="tag">bytes B0–B3 · classic 32-bit <code>time_t</code></span><span class="badge" id="t32-badge"></span></div>
+          <div class="when"><div class="big" id="t32-utc"></div><div class="pval" id="t32-local"></div><div class="pval" id="t32-rel"></div></div>
+          <div class="timeline" id="t32-line" title="Where this value sits in the i32 range"></div>
+          <label class="field"><span class="lab">Set date (ISO 8601, e.g. 2038-01-19T03:14:07Z — no Z means local time — or “now”)</span>
+            <div class="pickrow"><input type="text" id="t32-in" spellcheck="false" autocomplete="off"><button type="button" class="btn" data-now="t32">Now</button></div><small class="msg"></small></label>
+          <div class="kv">
+            <span>Seconds</span><code id="t32-secs"></code>
+            <span>As u32</span><code id="t32-u32"></code>
+          </div>
+          <p class="hint"><b>The Year 2038 problem:</b> a signed 32-bit count of seconds runs out at 2038-01-19 03:14:07 UTC (<span id="t32-y2038"></span>). One second later it wraps to INT32_MIN — 1901-12-13 20:45:52 UTC. Try the Y2038 preset, then press +1. Read as unsigned it would last until 2106; modern systems use 64 bits.</p>
+        </article>
+        <article class="card" data-lens="t64">
+          <div class="card-h"><h3>Unix milliseconds · i64</h3><span class="tag">bytes B0–B7 · JavaScript <code>Date</code>, Java</span><span class="badge" id="t64-badge"></span></div>
+          <div class="when"><div class="big" id="t64-utc"></div><div class="pval" id="t64-local"></div><div class="pval" id="t64-rel"></div></div>
+          <label class="field"><span class="lab">Set date (ISO 8601 or “now”)</span>
+            <div class="pickrow"><input type="text" id="t64-in" spellcheck="false" autocomplete="off"><button type="button" class="btn" data-now="t64">Now</button></div><small class="msg"></small></label>
+          <div class="kv">
+            <span>Milliseconds</span><code id="t64-ms"></code>
+            <span>As seconds</span><code id="t64-as-s"></code>
+            <span>As µs</span><code id="t64-as-us"></code>
+            <span>As ns</span><code id="t64-as-ns"></code>
+          </div>
+          <p class="hint">The same i64 means a very different date depending on the unit: seconds (C, Unix, most databases), milliseconds (JavaScript, Java), microseconds (Python, Postgres) or nanoseconds (Go, Linux kernel). JavaScript <code>Date</code> only allows ±8.64 × 10<sup>15</sup> ms — about 271,821 BC to AD 275,760.</p>
+        </article>
+      </div>
+    </section>
+
     <!-- Color -->
     <section class="deck" data-deck="color">
       <div class="deck-h"><h2>Color</h2><p>Packed pixel formats · swatches follow the byte order of the grid above</p></div>
@@ -474,7 +523,8 @@ const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
 const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
-const TAB_OF = { c32: 'color', c64: 'color', c565: 'color' };
+const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time' };
+Object.assign(DECK_OF, { t32: 'time', t64: 'time' });
 Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
 // display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
 const displayOrder = () => (state.order === 'le') === LITTLE ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -647,6 +697,8 @@ const LEGENDS = {
   c32: [['cr', 'Red'], ['cg', 'Green'], ['cb', 'Blue'], ['ca', 'Alpha'], ['', '8 bits each · 2 pixels']],
   c64: [['cr', 'Red'], ['cg', 'Green'], ['cb', 'Blue'], ['ca', 'Alpha'], ['', '16 bits each · 1 pixel']],
   c565: [['cr', 'Red (5)'], ['cg', 'Green (6)'], ['cb', 'Blue (5)'], ['', '4 pixels']],
+  t32: [['sign', 'Sign bit (dates before 1970)'], ['int', 'Seconds'], ['unused', 'Outside (B4–B7)']],
+  t64: [['sign', 'Sign bit (dates before 1970)'], ['int', 'Milliseconds']],
 };
 
 // position of (byte b, bit k) inside an n-byte native-endian number
@@ -664,6 +716,8 @@ function roleOf(b, k, d) {
     case 'c32': { const w = b >> 2; return CH_ROLE[state.colorLayout[3 - (valueBit(b - 4 * w, k, 4) >> 3)]]; }
     case 'c64': return CH_ROLE[state.colorLayout[3 - (valueBit(b, k, 8) >> 4)]];
     case 'c565': { const w = b >> 1, v = valueBit(b - 2 * w, k, 2); return v >= 11 ? 'cr' : v >= 5 ? 'cg' : 'cb'; }
+    case 't32': { if (b >= 4) return 'unused'; return valueBit(b, k, 4) === 31 ? 'sign' : 'int'; }
+    case 't64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
   }
 }
 
@@ -682,6 +736,8 @@ function byteNote(b, d) {
     case 'c32': { const w = b >> 2; return `px${w} ${state.colorLayout[3 - (valueBit(b - 4 * w, 0, 4) >> 3)]}`; }
     case 'c64': { const v = valueBit(b, 0, 8); return `${state.colorLayout[3 - (v >> 4)]} ${v % 16 ? 'hi' : 'lo'}`; }
     case 'c565': { const w = b >> 1; return `px${w} ${valueBit(b - 2 * w, 0, 2) ? 'hi' : 'lo'}`; }
+    case 't32': return b < 4 ? range(4) : '—';
+    case 't64': return range(8);
   }
 }
 
@@ -827,7 +883,7 @@ function setVal(el, v, src) {
   if (el === src) return;
   el.value = v;
   el.classList.remove('invalid');
-  const msg = el.parentElement.querySelector('.msg');
+  const msg = (el.closest('.field') || el.parentElement).querySelector('.msg');
   if (msg) msg.textContent = '';
 }
 const row = (l, r, cls = '') => `<div class="row"><span>${l}</span><span class="${cls}">${r}</span></div>`;
@@ -1062,12 +1118,13 @@ function update(src = null) {
   renderText(d, src);
   renderVarint(d, src);
   renderColor(src);
+  renderTime(src);
   renderLens();
 }
 
 /* ═══════════ Input → buffer bindings ═══════════ */
 function bind(id, parse, write) {
-  const el = $(id), msg = el.parentElement.querySelector('.msg');
+  const el = $(id), msg = (el.closest('.field') || el.parentElement).querySelector('.msg');
   const setMsg = t => { if (msg) msg.textContent = t; else el.title = t; };
   el.addEventListener('input', () => {
     let v;
@@ -1326,6 +1383,96 @@ function bindSmallFloats() {
   }
 }
 
+/* ═══════════ Time ═══════════ */
+const DATE_LIMIT = 8.64e15; // JS Date range in ms, either side of the epoch
+function fmtUTC(ms, withMs) {
+  if (!(Math.abs(ms) <= DATE_LIMIT)) return null;
+  const iso = new Date(ms).toISOString(); // e.g. 2038-01-19T03:14:07.000Z or +275760-09-13T…
+  const [d, t] = iso.slice(0, -1).split('T');
+  return `${d} ${withMs ? t : t.slice(0, 8)} UTC`;
+}
+function fmtLocal(ms) {
+  try { return new Date(ms).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'long' }); }
+  catch (_) { return ''; }
+}
+const RTF = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+function fmtRel(ms) {
+  const diff = (ms - Date.now()) / 1000, a = Math.abs(diff);
+  const units = [['year', 31557600], ['month', 2629800], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
+  for (const [u, sec] of units) {
+    if (a >= sec || u === 'second') {
+      const n = Math.round(diff / sec);
+      return Math.abs(n) >= 1e6 ? `${diff < 0 ? '' : 'in '}${fmtBig(BigInt(Math.abs(n)))} ${u}s${diff < 0 ? ' ago' : ''}` : RTF.format(n, u);
+    }
+  }
+}
+// date for an i64 count in a given unit (ms per unit as BigInt ratio)
+function bigToDate(v, mul, div) {
+  const ms = v * mul / div;
+  return ms > BigInt(DATE_LIMIT) || ms < -BigInt(DATE_LIMIT) ? '<span class="c-muted">outside JS Date range</span>' : fmtUTC(Number(ms), true);
+}
+
+function renderTime(src) {
+  // i32 seconds
+  const sec = i32[0], ms32 = sec * 1000;
+  $('t32-utc').textContent = fmtUTC(ms32, false);
+  $('t32-local').textContent = fmtLocal(ms32);
+  $('t32-rel').textContent = fmtRel(ms32);
+  const b32 = $('t32-badge');
+  b32.className = 'badge ' + (sec < 0 ? 'k-inf' : 'k-ok');
+  b32.textContent = sec < 0 ? 'before 1970 (sign bit set)' : 'after 1970';
+  setVal($('t32-in'), new Date(ms32).toISOString().replace('.000Z', 'Z'), src);
+  $('t32-secs').textContent = fmtBig(BigInt(sec));
+  $('t32-u32').textContent = fmtUTC(u32[0] * 1000, false);
+  $('t32-y2038').textContent = fmtRel(2147483647000);
+  const pos = x => `${((x + 2 ** 31) / 2 ** 32 * 100).toFixed(3)}%`;
+  const nowS = Math.floor(Date.now() / 1000);
+  $('t32-line').innerHTML = `<div class="track"></div>
+    <div class="tick l" style="left:0"><span>1901</span></div>
+    <div class="tick" style="left:50%"><span>1970</span></div>
+    ${nowS < 2 ** 31 ? `<div class="tick" style="left:${pos(nowS)}"><span>now</span></div>` : ''}
+    <div class="tick r" style="left:100%"><span>2038</span></div>
+    <div class="mark" style="left:${pos(sec)}" title="This value"></div>`;
+
+  // i64 milliseconds
+  const v = i64[0], ok = v <= BigInt(DATE_LIMIT) && v >= -BigInt(DATE_LIMIT), ms = Number(v);
+  const utc = $('t64-utc');
+  utc.className = 'big' + (ok ? '' : ' bad');
+  utc.textContent = ok ? fmtUTC(ms, true) : `Invalid Date — ${fmtBig(v)} ms is beyond ±8.64 × 10¹⁵`;
+  $('t64-local').textContent = ok ? fmtLocal(ms) : '';
+  $('t64-rel').textContent = ok ? fmtRel(ms) : '';
+  const b64 = $('t64-badge');
+  b64.className = 'badge ' + (ok ? (v < 0n ? 'k-inf' : 'k-ok') : 'k-bad');
+  b64.textContent = !ok ? 'out of Date range' : v < 0n ? 'before 1970 (sign bit set)' : 'valid JS Date';
+  setVal($('t64-in'), ok ? new Date(ms).toISOString() : '', src);
+  $('t64-ms').textContent = fmtBig(v);
+  $('t64-as-s').innerHTML = bigToDate(v, 1000n, 1n);
+  $('t64-as-us').innerHTML = bigToDate(v, 1n, 1000n);
+  $('t64-as-ns').innerHTML = bigToDate(v, 1n, 1000000n);
+}
+
+function parseDateText(s) {
+  const t = s.trim();
+  if (!t) return null;
+  const ms = t.toLowerCase() === 'now' ? Date.now() : Date.parse(t);
+  if (Number.isNaN(ms)) throw new Error('Expected a date like 2038-01-19T03:14:07Z, or “now”');
+  return ms;
+}
+function bindTime() {
+  const setSecs = ms => {
+    const s = Math.floor(ms / 1000);
+    if (s < -(2 ** 31) || s > 2 ** 31 - 1) throw new Error('Outside i32 seconds (1901-12-13 … 2038-01-19)');
+    i32[0] = s;
+  };
+  bind('t32-in', parseDateText, setSecs);
+  bind('t64-in', parseDateText, ms => { i64[0] = BigInt(ms); });
+  document.querySelectorAll('[data-now]').forEach(b => b.addEventListener('click', e => {
+    e.preventDefault(); // the button sits inside a <label>
+    if (b.dataset.now === 't32') setSecs(Date.now()); else i64[0] = BigInt(Date.now());
+    update();
+  }));
+}
+
 /* ═══════════ Toolbar, presets, lens interaction ═══════════ */
 const OPS = {
   zero: () => u8.fill(0),
@@ -1395,6 +1542,15 @@ const PRESETS = [
     ['Max: 2⁵⁶ − 1', () => writeBytes(encodeVarint((1n << 56n) - 1n))],
     ['Truncated (all MSBs set)', () => writeBytes([0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80])],
   ]],
+  ['time', [
+    ['Unix epoch (0)', () => { u8.fill(0); }, 't32'],
+    ['1,000,000,000 s (2001)', () => { u8.fill(0); i32[0] = 1e9; }, 't32'],
+    ['Y2038: last i32 second', () => { u8.fill(0); i32[0] = 2147483647; }, 't32'],
+    ['Y2038 + 1 s (wraps to 1901)', () => { u8.fill(0); i32[0] = -2147483648; }, 't32'],
+    ['Now (i32 seconds)', () => { u8.fill(0); i32[0] = Math.floor(Date.now() / 1000); }, 't32'],
+    ['Now (i64 milliseconds)', () => { i64[0] = BigInt(Date.now()); }, 't64'],
+    ['Latest JS Date (+275760)', () => { i64[0] = 8640000000000000n; }, 't64'],
+  ]],
   ['color', [
     ['RGBA: orange + half-transparent teal', () => { state.colorLayout = 'RGBA'; u32[0] = 0xFF8C1AFF; u32[1] = 0x1ABC9C80; }, 'c32'],
     ['Canvas bytes R,G,B,A (read as ABGR)', () => { state.colorLayout = 'ABGR'; writeBytes([0xFF, 0x8C, 0x1A, 0xFF, 0x1A, 0xBC, 0x9C, 0x80]); }, 'c32'],
@@ -1428,7 +1584,7 @@ function setupControls() {
   $('tabs').addEventListener('click', e => {
     const t = e.target.closest('[data-tab]');
     if (!t) return;
-    state.lens = t.dataset.tab === 'color' ? 'c32' : t.dataset.tab;
+    state.lens = { color: 'c32', time: 't32' }[t.dataset.tab] || t.dataset.tab;
     renderLens();
   });
 
@@ -1502,6 +1658,7 @@ buildColor();
 bindAll();
 bindColor();
 bindSmallFloats();
+bindTime();
 setupControls();
 u64[0] = 0x0123456789ABCDEFn;
 update();

@@ -131,13 +131,15 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .r-bad { --c: var(--bad); } .r-cont { --c: var(--cont); } .r-pay { --c: var(--pay); }
 .r-unused { --c: var(--unused); }
 .r-cr { --c: var(--red); } .r-cg { --c: var(--green); } .r-cb { --c: var(--blue); } .r-ca { --c: var(--alpha); }
+.r-oui { --c: var(--exp); } .r-nic { --c: var(--int); } .r-flag { --c: var(--sign); }
 
 /* hover-to-isolate a field's bits */
 .bytes[data-hl] .bit { opacity: .18; }
 .bytes[data-hl="sign"] .r-sign, .bytes[data-hl="exp"] .r-exp, .bytes[data-hl="mant"] .r-mant,
 .bytes[data-hl="int"] .r-int, .bytes[data-hl="txt"] .r-txt, .bytes[data-hl="prefix"] .r-prefix,
 .bytes[data-hl="bad"] .r-bad, .bytes[data-hl="cont"] .r-cont, .bytes[data-hl="pay"] .r-pay,
-.bytes[data-hl="cr"] .r-cr, .bytes[data-hl="cg"] .r-cg, .bytes[data-hl="cb"] .r-cb, .bytes[data-hl="ca"] .r-ca { opacity: 1; }
+.bytes[data-hl="cr"] .r-cr, .bytes[data-hl="cg"] .r-cg, .bytes[data-hl="cb"] .r-cb, .bytes[data-hl="ca"] .r-ca,
+.bytes[data-hl="oui"] .r-oui, .bytes[data-hl="nic"] .r-nic, .bytes[data-hl="flag"] .r-flag { opacity: 1; }
 
 .stream-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .hexrow { display: flex; align-items: center; gap: 8px; flex: 1 1 300px; min-width: 0; }
@@ -236,6 +238,11 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--alpha); }
 .chans span { cursor: default; }
 .c64ch { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
+/* network deck */
+.c-oui { color: var(--exp); } .c-nic { color: var(--int); } .c-flag { color: var(--sign); }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.badges .badge { margin-left: 0; }
+
 /* time deck */
 .when { margin-bottom: 12px; }
 .when .big { font: 600 20px/1.3 var(--mono); overflow-wrap: anywhere; }
@@ -324,6 +331,7 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
         <button role="tab" data-tab="text">Text</button>
         <button role="tab" data-tab="varint">Varint</button>
         <button role="tab" data-tab="time">Time</button>
+        <button role="tab" data-tab="net">Network</button>
         <button role="tab" data-tab="color">Color</button>
       </div>
       <div class="seg" id="viewSeg" title="Show only the cards for the current lens, or every card">
@@ -460,6 +468,36 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
       </div>
     </section>
 
+    <!-- Network -->
+    <section class="deck" data-deck="net">
+      <div class="deck-h"><h2>Network</h2><p>Addresses are stored in network byte order — most significant byte first, at the lowest address</p></div>
+      <div class="pair">
+        <article class="card" data-lens="ip4">
+          <div class="card-h"><h3>IPv4 address</h3><span class="tag">bytes B0–B3</span><span class="badge" id="ip4-badge"></span></div>
+          <div class="when"><div class="big" id="ip4-addr"></div><div class="pval" id="ip4-desc"></div></div>
+          <label class="field"><span class="lab">Address (dotted quad, e.g. 192.168.1.1)</span><input type="text" id="ip4-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label>
+          <div class="kv">
+            <span>Octets</span><code id="ip4-bin"></code>
+            <span>As a number</span><code id="ip4-num"></code>
+            <span>Native u32</span><code id="ip4-host"></code>
+          </div>
+          <p class="hint">A <code>struct in_addr</code> holds the four octets in network order: B0 is the first number. Read those bytes as a native u32 on a little-endian machine and the octets come out reversed — which is why C code calls <code>htonl()</code> / <code>ntohl()</code>. Try the “forgot htonl” preset.</p>
+        </article>
+        <article class="card" data-lens="mac">
+          <div class="card-h"><h3>MAC address</h3><span class="tag">bytes B0–B5 · 48 bits</span><span class="badges" id="mac-badges"></span></div>
+          <div class="when"><div class="big" id="mac-addr"></div><div class="pval" id="mac-desc"></div></div>
+          <label class="field"><span class="lab">Address (e.g. 02:42:ac:11:00:02)</span><input type="text" id="mac-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label>
+          <div class="kv">
+            <span>OUI</span><code id="mac-oui"></code>
+            <span>Device part</span><code id="mac-nic"></code>
+            <span>I/G bit</span><code id="mac-ig"></code>
+            <span>U/L bit</span><code id="mac-ul"></code>
+          </div>
+          <p class="hint">The first three bytes are the OUI, a prefix the IEEE assigns to each hardware vendor; the last three are chosen by the vendor. Two bits of the first byte are flags: bit 0 marks multicast, bit 1 marks a locally administered address (virtual machines, Docker, randomized Wi-Fi MACs). B6–B7 are unused.</p>
+        </article>
+      </div>
+    </section>
+
     <!-- Color -->
     <section class="deck" data-deck="color">
       <div class="deck-h"><h2>Color</h2><p>Packed pixel formats · swatches follow the byte order of the grid above</p></div>
@@ -523,8 +561,8 @@ const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
 const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
-const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time' };
-Object.assign(DECK_OF, { t32: 'time', t64: 'time' });
+const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net' };
+Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net' });
 Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
 // display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
 const displayOrder = () => (state.order === 'le') === LITTLE ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -683,7 +721,7 @@ const zigzagEncode = n => n >= 0n ? n << 1n : (-n << 1n) - 1n;
 const ROLE_NAMES = {
   sign: 'sign', exp: 'exponent', mant: 'mantissa', int: 'value bit', txt: 'code-point payload',
   prefix: 'UTF-8 marker', bad: 'invalid UTF-8', cont: 'continuation flag', pay: 'varint payload', unused: 'not in view',
-  cr: 'red', cg: 'green', cb: 'blue', ca: 'alpha',
+  cr: 'red', cg: 'green', cb: 'blue', ca: 'alpha', oui: 'OUI (vendor)', nic: 'device-specific', flag: 'MAC flag bit',
 };
 const LEGENDS = {
   f32: [['sign', 'Sign'], ['exp', 'Exponent (8)'], ['mant', 'Mantissa (23)'], ['unused', 'Outside f32 (B4–B7)']],
@@ -699,6 +737,8 @@ const LEGENDS = {
   c565: [['cr', 'Red (5)'], ['cg', 'Green (6)'], ['cb', 'Blue (5)'], ['', '4 pixels']],
   t32: [['sign', 'Sign bit (dates before 1970)'], ['int', 'Seconds'], ['unused', 'Outside (B4–B7)']],
   t64: [['sign', 'Sign bit (dates before 1970)'], ['int', 'Milliseconds']],
+  ip4: [['int', 'Address octets (B0 = first)'], ['unused', 'Outside (B4–B7)']],
+  mac: [['oui', 'OUI (vendor)'], ['flag', 'Multicast / local flags'], ['nic', 'Device-specific'], ['unused', 'Unused (B6–B7)']],
 };
 
 // position of (byte b, bit k) inside an n-byte native-endian number
@@ -718,6 +758,8 @@ function roleOf(b, k, d) {
     case 'c565': { const w = b >> 1, v = valueBit(b - 2 * w, k, 2); return v >= 11 ? 'cr' : v >= 5 ? 'cg' : 'cb'; }
     case 't32': { if (b >= 4) return 'unused'; return valueBit(b, k, 4) === 31 ? 'sign' : 'int'; }
     case 't64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
+    case 'ip4': return b < 4 ? 'int' : 'unused';
+    case 'mac': return b >= 6 ? 'unused' : b >= 3 ? 'nic' : b === 0 && k < 2 ? 'flag' : 'oui';
   }
 }
 
@@ -738,6 +780,8 @@ function byteNote(b, d) {
     case 'c565': { const w = b >> 1; return `px${w} ${valueBit(b - 2 * w, 0, 2) ? 'hi' : 'lo'}`; }
     case 't32': return b < 4 ? range(4) : '—';
     case 't64': return range(8);
+    case 'ip4': return b < 4 ? `octet ${b + 1}` : '—';
+    case 'mac': return b < 3 ? 'OUI' : b < 6 ? 'device' : '—';
   }
 }
 
@@ -1119,6 +1163,7 @@ function update(src = null) {
   renderVarint(d, src);
   renderColor(src);
   renderTime(src);
+  renderNet(src);
   renderLens();
 }
 
@@ -1473,6 +1518,74 @@ function bindTime() {
   }));
 }
 
+/* ═══════════ Network ═══════════ */
+function classifyIPv4([a, b, c, d]) {
+  const all = x => a === x && b === x && c === x && d === x;
+  if (all(0)) return ['unspecified', 'k-zero', '0.0.0.0 — “any address”, used when binding a server to every interface'];
+  if (all(255)) return ['broadcast', 'k-inf', 'Limited broadcast — every host on the local network'];
+  if (a === 127) return ['loopback', 'k-subnormal', '127.0.0.0/8 — this machine itself'];
+  if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return ['private', 'k-ok', 'Private range (RFC 1918) — home and office networks, not routed on the internet'];
+  if (a === 100 && b >= 64 && b <= 127) return ['carrier NAT', 'k-ok', '100.64.0.0/10 — shared address space used by ISPs for carrier-grade NAT'];
+  if (a === 169 && b === 254) return ['link-local', 'k-subnormal', '169.254.0.0/16 — self-assigned when no DHCP server answers'];
+  if ((a === 192 && b === 0 && c === 2) || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113)) return ['documentation', 'k-zero', 'Reserved for examples in documentation (RFC 5737)'];
+  if (a >= 224 && a <= 239) return ['multicast', 'k-inf', '224.0.0.0/4 — one-to-many delivery to a group'];
+  if (a >= 240) return ['reserved', 'k-bad', '240.0.0.0/4 — reserved, not usable'];
+  if (a === 0) return ['this network', 'k-zero', '0.0.0.0/8 — “this network”, only valid as a source'];
+  return ['public', 'k-normal', 'Public, globally routable address'];
+}
+
+function renderNet(src) {
+  const oct = Array.from(u8.subarray(0, 4)), dotted = oct.join('.');
+  const [label, cls, desc] = classifyIPv4(oct);
+  $('ip4-addr').textContent = dotted;
+  $('ip4-desc').textContent = desc;
+  const badge = $('ip4-badge');
+  badge.className = `badge ${cls}`;
+  badge.textContent = label;
+  setVal($('ip4-in'), dotted, src);
+  $('ip4-bin').textContent = oct.map(x => bin(x, 8)).join('.');
+  const num = (oct[0] * 2 ** 24) + (oct[1] << 16) + (oct[2] << 8) + oct[3];
+  $('ip4-num').textContent = `${fmtBig(BigInt(num))} = 0x${num.toString(16).toUpperCase().padStart(8, '0')}`;
+  const h = u32[0], hostDotted = [h >>> 24, (h >>> 16) & 255, (h >>> 8) & 255, h & 255].join('.');
+  $('ip4-host').innerHTML = hostDotted === dotted
+    ? `${fmtBig(BigInt(h))} → ${hostDotted} <span class="c-muted">(same either way)</span>`
+    : `${fmtBig(BigInt(h))} → <span class="c-bad">${hostDotted}</span> <span class="c-muted">(octets reversed — needs ntohl)</span>`;
+
+  const m = Array.from(u8.subarray(0, 6)), hx = m.map(x => x.toString(16).padStart(2, '0'));
+  const ig = m[0] & 1, ul = (m[0] >> 1) & 1, bcast = m.every(x => x === 255), zero = m.every(x => x === 0);
+  $('mac-addr').innerHTML = `<span class="c-oui" data-hl="oui">${hx.slice(0, 3).join(':')}</span>:<span class="c-nic" data-hl="nic">${hx.slice(3).join(':')}</span>`;
+  setVal($('mac-in'), hx.join(':'), src);
+  $('mac-desc').textContent = bcast ? 'Broadcast — every device on the local network segment'
+    : zero ? 'All zeros — not a valid device address'
+    : ig ? `Multicast group address, ${ul ? 'locally administered' : 'globally assigned (e.g. 01:00:5e:… is reserved for IPv4 multicast)'}`
+    : `A single device (unicast), ${ul ? 'locally administered (set by software, not the vendor)' : 'globally unique (burned in by the vendor)'}`;
+  $('mac-badges').innerHTML = bcast ? '<span class="badge k-inf">broadcast</span>'
+    : `<span class="badge ${ig ? 'k-inf' : 'k-ok'}">${ig ? 'multicast' : 'unicast'}</span><span class="badge ${ul ? 'k-subnormal' : 'k-normal'}">${ul ? 'local' : 'global'}</span>`;
+  $('mac-oui').innerHTML = `<span class="c-oui">${hx.slice(0, 3).join(':').toUpperCase()}</span> <span class="c-muted">${ul ? '(not a vendor prefix: locally administered)' : '— identifies the manufacturer'}</span>`;
+  $('mac-nic').innerHTML = `<span class="c-nic">${hx.slice(3).join(':').toUpperCase()}</span>`;
+  $('mac-ig').innerHTML = `<span class="c-flag" data-hl="flag">${ig}</span> → ${ig ? 'multicast / group' : 'unicast / individual'}`;
+  $('mac-ul').innerHTML = `<span class="c-flag" data-hl="flag">${ul}</span> → ${ul ? 'locally administered' : 'universally administered'}`;
+}
+
+function bindNet() {
+  bind('ip4-in', s => {
+    const t = s.trim();
+    if (!t) return null;
+    const m = t.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!m) throw new Error('Expected four numbers separated by dots, e.g. 10.0.0.1');
+    const o = m.slice(1).map(Number);
+    if (o.some(x => x > 255)) throw new Error('Each octet must be 0–255');
+    return o;
+  }, o => u8.set(o, 0));
+  bind('mac-in', s => {
+    const t = s.trim();
+    if (!t) return null;
+    const parts = /^[0-9a-f]{12}$/i.test(t) ? t.match(/../g) : t.split(/[:\-.]/);
+    if (parts.length !== 6 || parts.some(x => !/^[0-9a-f]{1,2}$/i.test(x))) throw new Error('Expected six hex bytes, e.g. 02:42:ac:11:00:02');
+    return parts.map(x => parseInt(x, 16));
+  }, b => u8.set(b, 0));
+}
+
 /* ═══════════ Toolbar, presets, lens interaction ═══════════ */
 const OPS = {
   zero: () => u8.fill(0),
@@ -1551,6 +1664,16 @@ const PRESETS = [
     ['Now (i64 milliseconds)', () => { i64[0] = BigInt(Date.now()); }, 't64'],
     ['Latest JS Date (+275760)', () => { i64[0] = 8640000000000000n; }, 't64'],
   ]],
+  ['network', [
+    ['IPv4 192.168.1.1 (private)', () => { u8.fill(0); u8.set([192, 168, 1, 1]); }, 'ip4'],
+    ['IPv4 127.0.0.1 (loopback)', () => { u8.fill(0); u8.set([127, 0, 0, 1]); }, 'ip4'],
+    ['IPv4 8.8.8.8 (public)', () => { u8.fill(0); u8.set([8, 8, 8, 8]); }, 'ip4'],
+    ['IPv4 255.255.255.255 (broadcast)', () => { u8.fill(0); u8.set([255, 255, 255, 255]); }, 'ip4'],
+    ['IPv4 “forgot htonl”: u32 0xC0A80101', () => { u8.fill(0); u32[0] = 0xC0A80101; }, 'ip4'],
+    ['MAC broadcast ff:ff:ff:ff:ff:ff', () => { u8.fill(0); u8.set([255, 255, 255, 255, 255, 255]); }, 'mac'],
+    ['MAC Docker container 02:42:ac:11:00:02', () => { u8.fill(0); u8.set([0x02, 0x42, 0xac, 0x11, 0x00, 0x02]); }, 'mac'],
+    ['MAC mDNS multicast 01:00:5e:00:00:fb', () => { u8.fill(0); u8.set([0x01, 0x00, 0x5e, 0x00, 0x00, 0xfb]); }, 'mac'],
+  ]],
   ['color', [
     ['RGBA: orange + half-transparent teal', () => { state.colorLayout = 'RGBA'; u32[0] = 0xFF8C1AFF; u32[1] = 0x1ABC9C80; }, 'c32'],
     ['Canvas bytes R,G,B,A (read as ABGR)', () => { state.colorLayout = 'ABGR'; writeBytes([0xFF, 0x8C, 0x1A, 0xFF, 0x1A, 0xBC, 0x9C, 0x80]); }, 'c32'],
@@ -1584,7 +1707,7 @@ function setupControls() {
   $('tabs').addEventListener('click', e => {
     const t = e.target.closest('[data-tab]');
     if (!t) return;
-    state.lens = { color: 'c32', time: 't32' }[t.dataset.tab] || t.dataset.tab;
+    state.lens = { color: 'c32', time: 't32', net: 'ip4' }[t.dataset.tab] || t.dataset.tab;
     renderLens();
   });
 
@@ -1659,6 +1782,7 @@ bindAll();
 bindColor();
 bindSmallFloats();
 bindTime();
+bindNet();
 setupControls();
 u64[0] = 0x0123456789ABCDEFn;
 update();

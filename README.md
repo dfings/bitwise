@@ -1,37 +1,61 @@
 # Bitwise
 
-One 64-bit buffer, many interpretations — flip bits and watch every view update live.
+One 64-bit buffer, many interpretations. Flip bits and watch every view update live.
 
-Bitwise is an interactive explorer for how the same 8 bytes read as integers, floating-point numbers, text, variable-width encodings and colors. Every view reads from and writes to a single shared `ArrayBuffer`, so editing any one of them immediately updates all the others.
+Bitwise shows how the same 8 bytes read as integers, floats, text, timestamps, addresses, machine code and colors. Every view reads from one shared `ArrayBuffer`. When you change any view, all the others update at once.
+
+**Try it:** https://dfings.github.io/bitwise/
 
 ## Running it
 
-Open `index.html` in a browser. It's a single self-contained file — no build step, dependencies or server.
+Open `index.html` in a browser. There is nothing to install or build, and no server.
 
 ## Views
 
-- **Integers** — `i32`/`u32` and `i64`/`u64`, with a two's-complement breakdown. Accepts decimal, `0x…`, `0b…` and `0o…`.
-- **Floating point** — IEEE 754 `f32` and `f64`, plus the 16-bit formats `f16` (half precision) and `bf16` (bfloat16): sign, exponent and mantissa, the formula worked through step by step, and the exact stored decimal value. Handles zero, subnormals, infinities and quiet/signaling NaNs.
-- **Fixed point** — Q16.16 (games and graphics) and Q1.15 (audio/DSP): an integer with an implied binary point, split into sign, integer and fraction bits.
-- **Text** — ASCII, UTF-8 and UTF-16 (with surrogate pairs), with invalid sequences flagged and non-printable bytes shown as symbols or escapes, plus Base64 with the 8-bit → 6-bit regrouping laid out.
-- **Protobuf varint** — a byte-by-byte decode of the 7-bit groups, plus the ZigZag (`sint64`) reading.
-- **Time** — Unix timestamps: `i32` seconds (with the Year 2038 rollover) and `i64` milliseconds as used by JavaScript `Date`, plus the same `i64` read as seconds, microseconds and nanoseconds.
-- **Network** — an IPv4 address (with its address class, and what happens if you read it as a native integer without `ntohl`) and a 48-bit MAC address (vendor prefix plus the multicast and locally-administered flag bits).
-- **Bit fields** — a Unix file mode (`st_mode`): file type, setuid/setgid/sticky and owner/group/other `rwx`, shown as `ls -l` output and `chmod` octal, with clickable permission bits; a 32-bit FAT / ZIP (MS-DOS) date and time; a RISC-V (RV32IM) instruction you can disassemble or assemble, with each field of its R/I/S/B/U/J format broken out; and a 64-bit Snowflake ID (as used by Twitter / X and Discord) split into timestamp, machine and sequence fields.
-- **Color** — two 32-bit RGBA pixels (with RGBA / ARGB / ABGR channel order), one 64-bit pixel (RGBA16 or half-float RGBA16F), and four RGB565 pixels.
-- **Bit stats & tricks** — popcount, leading/trailing zeros, highest set bit and power-of-two checks for `u32` and `u64`, plus classic tricks (`x & (x − 1)`, `x & −x`, rotates, bit reverse, byte swap) you can apply to the buffer.
+- **Integers.** Signed and unsigned, 32 and 64 bits, with the two's-complement math shown. Type values in decimal, `0x…`, `0b…` or `0o…`.
+- **Floating point.** `f64`, `f32`, `f16` and `bf16`. Each one is split into sign, exponent and mantissa, with the formula worked out step by step and the exact stored value. Zero, subnormals, infinity and both kinds of NaN are labeled.
+- **Fixed point.** Q16.16 (old 3D games) and Q1.15 (audio). An integer with an implied binary point.
+- **Text.** ASCII, UTF-8, UTF-16 and Base64. Invalid bytes and unpaired surrogates are flagged.
+- **Protobuf varint.** The 7-bit groups decoded byte by byte, plus the ZigZag reading.
+- **Time.** Unix seconds as `i32`, which runs out in 2038, and milliseconds as `i64`, as in JavaScript `Date`.
+- **Network.** An IPv4 address and a MAC address. Shows what goes wrong if you forget `ntohl`.
+- **Bit fields.** A Unix file mode, a FAT/ZIP timestamp, a RISC-V instruction and a Snowflake ID. Each field has its own color. You can type RISC-V assembly and see the machine code.
+- **Color.** RGBA, RGBA16 and RGB565 pixels.
+- **Tricks.** Popcount, leading and trailing zeros, and classic bit hacks you can apply to the buffer.
 
 ## Using it
 
-- **Bit grid** — click a bit to toggle it, or press and drag to paint several. The tabs choose which view colors the bits (sign/exponent/mantissa, channels, and so on).
-- **Byte order** — view the bytes big-endian (most significant byte first, as in network byte order) or little-endian.
-- **Hover** a field such as "Exponent" or a color channel to isolate its bits in the grid.
-- **Focused / All** — show only the cards for the current view, or everything.
-- **Toolbar** — edit the raw bytes as hex, apply operations (NOT, shifts, ±1, byte swap, random) or load a preset such as `INT64_MIN`, π, a signaling NaN, a truncated varint or canvas pixel bytes.
+**Flip a bit**
+1. Click a bit in the grid.
+   *Result:* the bit flips, and every view updates.
+2. To flip several bits, press and drag across them.
+
+**Pick a view**
+1. Click a tab, such as **f32** or **Fields**.
+   *Result:* the grid colors the bits by that view's fields, and the page scrolls to its cards.
+2. Hover over a field, such as **Exponent**.
+   *Result:* the grid fades every bit outside that field.
+
+**Change the byte order**
+1. Click **Big-endian** or **Little-endian**.
+   *Result:* the grid and hex row show the bytes in that order. Big-endian is network byte order.
+
+**Edit the bytes directly**
+1. Type hex into the **Bytes** field, or use a toolbar button such as **NOT**, **≪ 1** or **Byte swap**.
+   *Result:* every view updates.
+
+**Show one view at a time**
+1. Click **Focused**. Click **All** to see everything again.
+   Phones start in Focused.
+
+**Load an example**
+1. Open **Presets** and pick one, such as `INT64_MIN`, a signaling NaN, the Y2038 rollover or `ret`.
 
 ## How it works
 
-The page creates one 8-byte `ArrayBuffer` and layers typed-array views over it (`Uint8Array`, `Int32Array`, `Float64Array`, `BigInt64Array` and others). Typed arrays use the machine's native byte order — little-endian on practically all hardware — which is why the byte-order switch matters. 64-bit integers use `BigInt`; the varint, UTF-8 and 16-bit float (f16/bf16) codecs are implemented by hand.
+The page makes one 8-byte `ArrayBuffer` and reads it through typed arrays (`Uint8Array`, `Float64Array`, `BigInt64Array` and others). Typed arrays use your machine's byte order, which is little-endian on almost all hardware. That is why the byte-order switch matters.
+
+The varint, UTF-8, UTF-16, Base64, 16-bit float and RISC-V codecs are written by hand.
 
 ## License
 

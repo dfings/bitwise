@@ -2783,6 +2783,8 @@ function syncViewSeg() {
 }
 
 /* ═══════════ Boot ═══════════ */
+// small screens (where the full header isn't pinned) start focused on one deck
+if (matchMedia('(max-width: 699px), (max-height: 599px)').matches) state.view = 'focus';
 syncViewSeg();
 $('card-f32').innerHTML = floatCard('f32', 8, 23, 'bytes B0–B3');
 $('card-f64').innerHTML = floatCard('f64', 11, 52, 'bytes B0–B7');

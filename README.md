@@ -16,6 +16,7 @@ Open `index.html` in a browser. It's a single self-contained file — no build s
 - **Protobuf varint** — a byte-by-byte decode of the 7-bit groups, plus the ZigZag (`sint64`) reading.
 - **Time** — Unix timestamps: `i32` seconds (with the Year 2038 rollover) and `i64` milliseconds as used by JavaScript `Date`, plus the same `i64` read as seconds, microseconds and nanoseconds.
 - **Network** — an IPv4 address (with its address class, and what happens if you read it as a native integer without `ntohl`) and a 48-bit MAC address (vendor prefix plus the multicast and locally-administered flag bits).
+- **Bit stats & tricks** — popcount, leading/trailing zeros, highest set bit and power-of-two checks for `u32` and `u64`, plus classic tricks (`x & (x − 1)`, `x & −x`, rotates, bit reverse, byte swap) you can apply to the buffer.
 - **Color** — two 32-bit RGBA pixels (with RGBA / ARGB / ABGR channel order), one 64-bit pixel (RGBA16 or half-float RGBA16F), and four RGB565 pixels.
 
 ## Using it

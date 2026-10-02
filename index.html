@@ -132,6 +132,7 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .r-unused { --c: var(--unused); }
 .r-cr { --c: var(--red); } .r-cg { --c: var(--green); } .r-cb { --c: var(--blue); } .r-ca { --c: var(--alpha); }
 .r-oui { --c: var(--exp); } .r-nic { --c: var(--int); } .r-flag { --c: var(--sign); }
+.r-one { --c: var(--txt); } .r-lz { --c: var(--exp); } .r-tz { --c: var(--pay); }
 
 /* hover-to-isolate a field's bits */
 .bytes[data-hl] .bit { opacity: .18; }
@@ -139,7 +140,8 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .bytes[data-hl="int"] .r-int, .bytes[data-hl="txt"] .r-txt, .bytes[data-hl="prefix"] .r-prefix,
 .bytes[data-hl="bad"] .r-bad, .bytes[data-hl="cont"] .r-cont, .bytes[data-hl="pay"] .r-pay,
 .bytes[data-hl="cr"] .r-cr, .bytes[data-hl="cg"] .r-cg, .bytes[data-hl="cb"] .r-cb, .bytes[data-hl="ca"] .r-ca,
-.bytes[data-hl="oui"] .r-oui, .bytes[data-hl="nic"] .r-nic, .bytes[data-hl="flag"] .r-flag { opacity: 1; }
+.bytes[data-hl="oui"] .r-oui, .bytes[data-hl="nic"] .r-nic, .bytes[data-hl="flag"] .r-flag,
+.bytes[data-hl="one"] .r-one, .bytes[data-hl="lz"] .r-lz, .bytes[data-hl="tz"] .r-tz { opacity: 1; }
 
 .stream-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .hexrow { display: flex; align-items: center; gap: 8px; flex: 1 1 300px; min-width: 0; }
@@ -238,6 +240,17 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--alpha); }
 .chans span { cursor: default; }
 .c64ch { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
+/* bits deck */
+.c-one { color: var(--txt); } .c-lz { color: var(--exp); } .c-tz { color: var(--pay); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.stat { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+.stat .k { font-size: 11.5px; color: var(--muted); }
+.stat .v { font: 600 17px/1.35 var(--mono); overflow-wrap: anywhere; }
+.stat .s { font-size: 11.5px; color: var(--faint); }
+.tricks td:first-child { color: var(--text); }
+.tricks td.d { font-family: var(--sans); color: var(--muted); white-space: normal; min-width: 12em; }
+.tricks .btn { padding: 2px 9px; }
+
 /* network deck */
 .c-oui { color: var(--exp); } .c-nic { color: var(--int); } .c-flag { color: var(--sign); }
 .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
@@ -332,6 +345,7 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
         <button role="tab" data-tab="varint">Varint</button>
         <button role="tab" data-tab="time">Time</button>
         <button role="tab" data-tab="net">Network</button>
+        <button role="tab" data-tab="bits">Bits</button>
         <button role="tab" data-tab="color">Color</button>
       </div>
       <div class="seg" id="viewSeg" title="Show only the cards for the current lens, or every card">
@@ -498,6 +512,15 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
       </div>
     </section>
 
+    <!-- Bits -->
+    <section class="deck" data-deck="bits">
+      <div class="deck-h"><h2>Bit stats &amp; tricks</h2><p>Counting and manipulating bits — the operations behind hash tables, allocators and chess engines</p></div>
+      <div class="pair">
+        <article class="card" data-lens="b32" id="card-b32"></article>
+        <article class="card" data-lens="b64" id="card-b64"></article>
+      </div>
+    </section>
+
     <!-- Color -->
     <section class="deck" data-deck="color">
       <div class="deck-h"><h2>Color</h2><p>Packed pixel formats · swatches follow the byte order of the grid above</p></div>
@@ -561,8 +584,8 @@ const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
 const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
-const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net' };
-Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net' });
+const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits' };
+Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits' });
 Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
 // display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
 const displayOrder = () => (state.order === 'le') === LITTLE ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -722,6 +745,7 @@ const ROLE_NAMES = {
   sign: 'sign', exp: 'exponent', mant: 'mantissa', int: 'value bit', txt: 'code-point payload',
   prefix: 'UTF-8 marker', bad: 'invalid UTF-8', cont: 'continuation flag', pay: 'varint payload', unused: 'not in view',
   cr: 'red', cg: 'green', cb: 'blue', ca: 'alpha', oui: 'OUI (vendor)', nic: 'device-specific', flag: 'MAC flag bit',
+  one: 'set bit', lz: 'leading zero', tz: 'trailing zero',
 };
 const LEGENDS = {
   f32: [['sign', 'Sign'], ['exp', 'Exponent (8)'], ['mant', 'Mantissa (23)'], ['unused', 'Outside f32 (B4–B7)']],
@@ -739,6 +763,8 @@ const LEGENDS = {
   t64: [['sign', 'Sign bit (dates before 1970)'], ['int', 'Milliseconds']],
   ip4: [['int', 'Address octets (B0 = first)'], ['unused', 'Outside (B4–B7)']],
   mac: [['oui', 'OUI (vendor)'], ['flag', 'Multicast / local flags'], ['nic', 'Device-specific'], ['unused', 'Unused (B6–B7)']],
+  b64: [['one', 'Set bits (1s)'], ['lz', 'Leading zeros'], ['tz', 'Trailing zeros'], ['unused', 'Other zeros']],
+  b32: [['one', 'Set bits (1s)'], ['lz', 'Leading zeros'], ['tz', 'Trailing zeros'], ['unused', 'Other zeros · outside (B4–B7)']],
 };
 
 // position of (byte b, bit k) inside an n-byte native-endian number
@@ -760,6 +786,13 @@ function roleOf(b, k, d) {
     case 't64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
     case 'ip4': return b < 4 ? 'int' : 'unused';
     case 'mac': return b >= 6 ? 'unused' : b >= 3 ? 'nic' : b === 0 && k < 2 ? 'flag' : 'oui';
+    case 'b64': case 'b32': {
+      const w = state.lens === 'b64' ? 64 : 32;
+      if (b >= w / 8) return 'unused';
+      const info = w === 64 ? d.b64 : d.b32, v = valueBit(b, k, w / 8);
+      if ((u8[b] >> k) & 1) return 'one';
+      return v > info.hi ? 'lz' : v < info.ctz ? 'tz' : 'unused';
+    }
   }
 }
 
@@ -782,6 +815,8 @@ function byteNote(b, d) {
     case 't64': return range(8);
     case 'ip4': return b < 4 ? `octet ${b + 1}` : '—';
     case 'mac': return b < 3 ? 'OUI' : b < 6 ? 'device' : '—';
+    case 'b64': return range(8);
+    case 'b32': return b < 4 ? range(4) : '—';
   }
 }
 
@@ -1148,7 +1183,7 @@ function renderHexAll(src) {
   $('hexLab').textContent = state.order === 'be' ? 'Bytes (hex, MSB first)' : 'Bytes (hex, LSB first)';
 }
 
-function derive() { return { utf8: decodeUtf8(u8), varint: decodeVarint(u8) }; }
+function derive() { return { utf8: decodeUtf8(u8), varint: decodeVarint(u8), b64: bitInfo(u64[0], 64), b32: bitInfo(BigInt(u32[0]), 32) }; }
 
 function update(src = null) {
   const d = derive();
@@ -1164,6 +1199,7 @@ function update(src = null) {
   renderColor(src);
   renderTime(src);
   renderNet(src);
+  renderBits(d);
   renderLens();
 }
 
@@ -1586,6 +1622,75 @@ function bindNet() {
   }, b => u8.set(b, 0));
 }
 
+/* ═══════════ Bit stats & tricks ═══════════ */
+function bitInfo(x, w) {
+  const b = x.toString(2);
+  const pop = x === 0n ? 0 : [...b].filter(c => c === '1').length;
+  const clz = x === 0n ? w : w - b.length;
+  const ctz = x === 0n ? w : (x & -x).toString(2).length - 1;
+  return { pop, clz, ctz, hi: x === 0n ? -1 : b.length - 1 };
+}
+const bitReverse = (x, w) => BigInt('0b' + [...bin(x, w)].reverse().join(''));
+const byteSwap = (x, w) => BigInt('0x' + x.toString(16).padStart(w / 4, '0').match(/../g).reverse().join(''));
+const TRICKS = [
+  ['x & (x − 1)', 'Clear the lowest set bit. Repeat until 0 to count bits (Kernighan’s popcount).', (x, w, M) => x & (x - 1n)],
+  ['x & −x', 'Isolate the lowest set bit. Used by Fenwick trees and to find free slots.', (x, w, M) => x & (-x & M)],
+  ['x | (x + 1)', 'Set the lowest clear bit — e.g. claim the next free slot in a bitmap.', (x, w, M) => (x | (x + 1n)) & M],
+  ['rotl(x, 1)', 'Rotate left: the top bit wraps around to the bottom. Common in hash functions.', (x, w, M) => ((x << 1n) | (x >> BigInt(w - 1))) & M],
+  ['rotr(x, 1)', 'Rotate right: the bottom bit wraps around to the top.', (x, w, M) => ((x >> 1n) | (x << BigInt(w - 1))) & M],
+  ['reverse(x)', 'Reverse the order of all bits — used in FFTs and CRCs.', (x, w) => bitReverse(x, w)],
+  ['bswap(x)', 'Reverse the bytes — converts between little- and big-endian (htonl / ntohl).', (x, w) => byteSwap(x, w)],
+];
+
+function bitsCard(w) {
+  const bytes = w === 64 ? 'B0–B7' : 'B0–B3';
+  return `
+    <div class="card-h"><h3>u${w}</h3><span class="tag">bytes ${bytes}</span><span class="badge" id="b${w}-badge"></span></div>
+    <div class="stats">
+      <div class="stat" data-hl="one"><div class="k">Set bits (popcount)</div><div class="v c-one" id="b${w}-pop"></div><div class="s" id="b${w}-par"></div></div>
+      <div class="stat" data-hl="lz"><div class="k">Leading zeros (clz)</div><div class="v c-lz" id="b${w}-clz"></div><div class="s">zeros above the highest 1</div></div>
+      <div class="stat" data-hl="tz"><div class="k">Trailing zeros (ctz)</div><div class="v c-tz" id="b${w}-ctz"></div><div class="s">zeros below the lowest 1</div></div>
+      <div class="stat"><div class="k">Highest set bit</div><div class="v" id="b${w}-hi"></div><div class="s" id="b${w}-log"></div></div>
+      <div class="stat"><div class="k">Next power of two</div><div class="v" id="b${w}-next"></div><div class="s" id="b${w}-nexts"></div></div>
+    </div>
+    <div class="tablewrap"><table class="tricks">
+      <thead><tr><th>Trick</th><th>Result</th><th></th><th>What it does</th></tr></thead>
+      <tbody>${TRICKS.map(([name, desc], i) => `<tr><td>${name}</td><td id="b${w}-t${i}"></td><td><button type="button" class="btn" data-apply="${w}:${i}">Apply</button></td><td class="d">${desc}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+function renderBits(d) {
+  for (const w of [32, 64]) {
+    const x = w === 64 ? u64[0] : BigInt(u32[0]), info = w === 64 ? d.b64 : d.b32, M = (1n << BigInt(w)) - 1n;
+    const hexw = v => '0x' + v.toString(16).toUpperCase().padStart(w / 4, '0');
+    const pow2 = x !== 0n && (x & (x - 1n)) === 0n;
+    const badge = $(`b${w}-badge`);
+    badge.className = 'badge ' + (pow2 ? 'k-ok' : x === 0n ? 'k-zero' : 'k-normal');
+    badge.textContent = pow2 ? `power of two (2^${info.hi})` : x === 0n ? 'zero' : 'not a power of two';
+    $(`b${w}-pop`).textContent = `${info.pop} / ${w}`;
+    $(`b${w}-par`).textContent = `parity: ${info.pop % 2 ? 'odd' : 'even'}`;
+    $(`b${w}-clz`).textContent = info.clz;
+    $(`b${w}-ctz`).textContent = info.ctz;
+    $(`b${w}-hi`).textContent = x === 0n ? '—' : `bit ${info.hi}`;
+    $(`b${w}-log`).textContent = x === 0n ? 'no bits set' : `⌊log₂ x⌋ = ${info.hi}`;
+    const next = x <= 1n ? 1n : pow2 ? x : 1n << BigInt(info.hi + 1);
+    $(`b${w}-next`).textContent = next > M ? 'overflow' : next >= 1n << 20n ? `2^${next.toString(2).length - 1}` : next.toString();
+    $(`b${w}-nexts`).textContent = next > M ? `needs bit ${info.hi + 1}` : 'smallest 2ⁿ ≥ x';
+    TRICKS.forEach(([, , fn], i) => { $(`b${w}-t${i}`).textContent = hexw(fn(x, w, M)); });
+  }
+}
+
+function bindBits() {
+  document.querySelector('[data-deck="bits"]').addEventListener('click', e => {
+    const t = e.target.closest('[data-apply]');
+    if (!t) return;
+    const [w, i] = t.dataset.apply.split(':').map(Number), M = (1n << BigInt(w)) - 1n;
+    const x = w === 64 ? u64[0] : BigInt(u32[0]), r = TRICKS[i][2](x, w, M);
+    if (w === 64) u64[0] = r; else u32[0] = Number(r);
+    update();
+  });
+}
+
 /* ═══════════ Toolbar, presets, lens interaction ═══════════ */
 const OPS = {
   zero: () => u8.fill(0),
@@ -1674,6 +1779,12 @@ const PRESETS = [
     ['MAC Docker container 02:42:ac:11:00:02', () => { u8.fill(0); u8.set([0x02, 0x42, 0xac, 0x11, 0x00, 0x02]); }, 'mac'],
     ['MAC mDNS multicast 01:00:5e:00:00:fb', () => { u8.fill(0); u8.set([0x01, 0x00, 0x5e, 0x00, 0x00, 0xfb]); }, 'mac'],
   ]],
+  ['bits', [
+    ['u32 0x00FF0000 (middle byte)', () => { u8.fill(0); u32[0] = 0x00FF0000; }, 'b32'],
+    ['u32 0xF0F0F0F0 (popcount 16)', () => { u8.fill(0); u32[0] = 0xF0F0F0F0; }, 'b32'],
+    ['u64 power of two: 2⁴⁰', () => { u64[0] = 1n << 40n; }, 'b64'],
+    ['u64 0b101000 (40): 3 trailing zeros', () => { u64[0] = 40n; }, 'b64'],
+  ]],
   ['color', [
     ['RGBA: orange + half-transparent teal', () => { state.colorLayout = 'RGBA'; u32[0] = 0xFF8C1AFF; u32[1] = 0x1ABC9C80; }, 'c32'],
     ['Canvas bytes R,G,B,A (read as ABGR)', () => { state.colorLayout = 'ABGR'; writeBytes([0xFF, 0x8C, 0x1A, 0xFF, 0x1A, 0xBC, 0x9C, 0x80]); }, 'c32'],
@@ -1707,7 +1818,7 @@ function setupControls() {
   $('tabs').addEventListener('click', e => {
     const t = e.target.closest('[data-tab]');
     if (!t) return;
-    state.lens = { color: 'c32', time: 't32', net: 'ip4' }[t.dataset.tab] || t.dataset.tab;
+    state.lens = { color: 'c32', time: 't32', net: 'ip4', bits: 'b32' }[t.dataset.tab] || t.dataset.tab;
     renderLens();
   });
 
@@ -1770,6 +1881,8 @@ function syncViewSeg() {
 syncViewSeg();
 $('card-f32').innerHTML = floatCard('f32', 8, 23, 'bytes B0–B3');
 $('card-f64').innerHTML = floatCard('f64', 11, 52, 'bytes B0–B7');
+$('card-b64').innerHTML = bitsCard(64);
+$('card-b32').innerHTML = bitsCard(32);
 $('card-f16').innerHTML = floatCard('f16', 5, 10, 'bytes B0–B1');
 $('card-bf16').innerHTML = floatCard('bf16', 8, 7, 'bytes B0–B1');
 $('card-i32').innerHTML = intCard(32, 'bytes B0–B3');
@@ -1783,6 +1896,7 @@ bindColor();
 bindSmallFloats();
 bindTime();
 bindNet();
+bindBits();
 setupControls();
 u64[0] = 0x0123456789ABCDEFn;
 update();

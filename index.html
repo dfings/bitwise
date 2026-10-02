@@ -74,10 +74,19 @@ body[data-view="focus"] .deck:not(.current) { display: none; }
   background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
   padding: 10px 12px 12px; margin-bottom: 12px;
 }
+/* The dock (title + tabs, bit grid, toolbar) stays pinned on laptop-sized screens.
+   On small screens only the bit grid is pinned; the dock box is dissolved so the grid can stick to the page. */
+.dock { display: contents; }
+.toolbar { margin-bottom: 18px; }
 @media (min-height: 480px) {
   .stream { position: sticky; top: 0; z-index: 20; border-top-left-radius: 0; border-top-right-radius: 0; box-shadow: 0 12px 28px -12px #000e; }
 }
-.toolbar { margin-bottom: 18px; }
+@media (min-width: 700px) and (min-height: 600px) {
+  .dock { display: block; position: sticky; top: 0; z-index: 20; background: var(--bg); padding-bottom: 10px; margin-bottom: 14px; box-shadow: 0 14px 24px -16px #000; }
+  .dock .titlebar { padding: 10px 0 8px; }
+  .dock .stream { position: static; border-radius: 14px; box-shadow: none; margin-bottom: 8px; }
+  .dock .toolbar { margin-bottom: 0; }
+}
 @media (max-width: 600px) { .long { display: none; } .stream-bar { margin-bottom: 8px; } .byte-meta { margin-top: 3px; } }
 .stream-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 
@@ -349,6 +358,7 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
 </head>
 <body data-lens="i64" data-view="all">
 <div class="wrap">
+  <div class="dock" id="dock">
   <header>
     <div class="titlebar">
       <h1>Bitwise <small>one 8-byte ArrayBuffer · every view live</small></h1>
@@ -404,6 +414,7 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
         </div>
       </div>
     </section>
+  </div>
 
   <main id="main">
     <!-- Integers -->
@@ -2037,6 +2048,20 @@ const PRESETS = [
   ]],
 ];
 
+// bring the active lens's card into view, just below the pinned bit grid
+function scrollToLens() {
+  const card = document.querySelector(`.card[data-lens="${state.lens}"]`);
+  if (!card) return;
+  const deck = card.closest('.deck');
+  // the first row of a deck scrolls to the deck so its heading stays visible
+  const target = card.getBoundingClientRect().top - deck.getBoundingClientRect().top < 80 ? deck : card;
+  const dock = $('dock');
+  if (getComputedStyle(dock).position !== 'sticky') return; // tabs would scroll away on small screens
+  const pinned = dock.offsetHeight;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: target.getBoundingClientRect().top + scrollY - pinned - 12, behavior: reduce ? 'auto' : 'smooth' });
+}
+
 function setupControls() {
   const sel = $('preset');
   sel.innerHTML = '<option value="">Presets…</option>' + PRESETS.map(([lens, items], gi) =>
@@ -2063,6 +2088,7 @@ function setupControls() {
     if (!t) return;
     state.lens = { color: 'c32', time: 't32', net: 'ip4', bits: 'b32', fixed: 'q16', fields: 'perm' }[t.dataset.tab] || t.dataset.tab;
     renderLens();
+    scrollToLens();
   });
 
   $('orderSeg').addEventListener('click', e => {

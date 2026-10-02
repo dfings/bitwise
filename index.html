@@ -1,0 +1,1453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitwise</title>
+<style>
+:root {
+  --bg: #0a0d13;
+  --panel: #111620;
+  --panel-2: #161c28;
+  --inset: #0c1018;
+  --border: #222b3b;
+  --border-2: #2f3b52;
+  --text: #e6edf3;
+  --muted: #8b98ab;
+  --faint: #5b677a;
+  --accent: #7aa2ff;
+  --warn: #ffb547;
+
+  --sign: #ff6b8b;
+  --exp: #5fb3ff;
+  --mant: #7ee787;
+  --int: #c4a7ff;
+  --txt: #ffd166;
+  --prefix: #ff8f5a;
+  --bad: #ff5c5c;
+  --cont: #ff8f5a;
+  --pay: #2dd4bf;
+  --unused: #465063;
+  --red: #ff5f5f;
+  --green: #4ade80;
+  --blue: #60a5fa;
+  --alpha: #b4bcc8;
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 var(--sans);
+}
+code, input, .mono { font-family: var(--mono); }
+button, select, input { font: inherit; color: inherit; }
+
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 16px; }
+
+/* ───────── Header / bitstream ───────── */
+.titlebar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 18px 0 12px;
+}
+h1 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -0.01em; }
+h1 small { color: var(--muted); font-weight: 450; font-size: 13px; margin-left: 8px; }
+
+.nav { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+#viewSeg button { padding: 7px 12px; font-size: 13px; }
+body[data-view="focus"] .deck:not(.current) { display: none; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; background: var(--panel); border: 1px solid var(--border); padding: 3px; border-radius: 10px; }
+.tabs button {
+  border: 0; background: transparent; padding: 5px 11px; border-radius: 7px; cursor: pointer;
+  color: var(--muted); font-size: 13px; font-weight: 550;
+}
+.tabs button:hover { color: var(--text); background: var(--panel-2); }
+.tabs button[aria-selected="true"] { background: var(--accent); color: #0a0d13; }
+
+.stream {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 10px 12px 12px; margin-bottom: 12px;
+}
+@media (min-height: 480px) {
+  .stream { position: sticky; top: 0; z-index: 20; border-top-left-radius: 0; border-top-right-radius: 0; box-shadow: 0 12px 28px -12px #000e; }
+}
+.toolbar { margin-bottom: 18px; }
+@media (max-width: 600px) { .long { display: none; } .stream-bar { margin-bottom: 8px; } .byte-meta { margin-top: 3px; } }
+.stream-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+.legend .chip { display: inline-flex; align-items: center; gap: 6px; }
+.sw { --c: var(--unused); display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: var(--c); flex: none; }
+
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 4px 10px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.on { background: var(--panel-2); color: var(--text); }
+
+.bytes { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 860px) { .bytes { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 440px) { .bytes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.byte {
+  position: relative; background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 6px 6px 5px; transition: border-color .15s, box-shadow .15s;
+}
+.byte-bits { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px; touch-action: none; }
+.byte-meta { display: flex; justify-content: space-between; gap: 4px; margin-top: 5px; font: 11px/1.2 var(--mono); color: var(--muted); white-space: nowrap; }
+.byte-meta .bhex { color: var(--text); }
+.byte-meta .bnote { color: var(--faint); overflow: hidden; text-overflow: ellipsis; }
+.byte.in-varint::after {
+  content: ""; position: absolute; left: 10px; right: 10px; bottom: -5px; height: 3px;
+  border-radius: 2px; background: var(--pay); opacity: .45;
+}
+body[data-lens="varint"] .byte.in-varint { border-color: var(--pay); box-shadow: inset 0 0 0 1px var(--pay); }
+body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
+.byte.peek { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
+.bit {
+  --c: var(--unused);
+  aspect-ratio: 1 / 1; min-width: 0; padding: 0; margin: 0;
+  display: grid; place-items: center;
+  border-radius: 4px; cursor: pointer; user-select: none;
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  background: color-mix(in srgb, var(--c) 9%, transparent);
+  color: color-mix(in srgb, var(--c) 60%, var(--muted));
+  font: 600 clamp(9px, 0.95vw, 12px)/1 var(--mono);
+  transition: background .12s, opacity .15s, transform .08s;
+}
+.bit.on { background: var(--c); border-color: var(--c); color: #0a0d13; }
+.bit:hover { transform: translateY(-1px); box-shadow: 0 0 0 1px var(--c); }
+.bit:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.r-unused.on { color: var(--text); }
+
+.r-sign { --c: var(--sign); } .r-exp { --c: var(--exp); } .r-mant { --c: var(--mant); }
+.r-int { --c: var(--int); } .r-txt { --c: var(--txt); } .r-prefix { --c: var(--prefix); }
+.r-bad { --c: var(--bad); } .r-cont { --c: var(--cont); } .r-pay { --c: var(--pay); }
+.r-unused { --c: var(--unused); }
+.r-cr { --c: var(--red); } .r-cg { --c: var(--green); } .r-cb { --c: var(--blue); } .r-ca { --c: var(--alpha); }
+
+/* hover-to-isolate a field's bits */
+.bytes[data-hl] .bit { opacity: .18; }
+.bytes[data-hl="sign"] .r-sign, .bytes[data-hl="exp"] .r-exp, .bytes[data-hl="mant"] .r-mant,
+.bytes[data-hl="int"] .r-int, .bytes[data-hl="txt"] .r-txt, .bytes[data-hl="prefix"] .r-prefix,
+.bytes[data-hl="bad"] .r-bad, .bytes[data-hl="cont"] .r-cont, .bytes[data-hl="pay"] .r-pay,
+.bytes[data-hl="cr"] .r-cr, .bytes[data-hl="cg"] .r-cg, .bytes[data-hl="cb"] .r-cb, .bytes[data-hl="ca"] .r-ca { opacity: 1; }
+
+.stream-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hexrow { display: flex; align-items: center; gap: 8px; flex: 1 1 300px; min-width: 0; }
+.hexrow .lab { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.hexrow input { flex: 1; min-width: 0; }
+.ops { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.btn, select.btn {
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 5px 10px; font-size: 12px; cursor: pointer; color: var(--text);
+}
+.btn:hover { border-color: var(--border-2); background: #1b2232; }
+select.btn { padding-right: 6px; max-width: 100%; }
+
+/* ───────── Inputs ───────── */
+input[type="text"] {
+  width: 100%; background: var(--inset); border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; font-size: 13px; outline: none; transition: border-color .12s;
+}
+input[type="text"]:focus { border-color: var(--accent); }
+input.invalid { border-color: var(--bad); }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field .lab { font-size: 12px; color: var(--muted); }
+.field .msg { color: var(--bad); font-size: 11.5px; min-height: 1.2em; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 10px; margin-bottom: 6px; }
+
+/* ───────── Decks ───────── */
+main { padding-bottom: 40px; }
+.deck { margin-bottom: 26px; }
+.deck-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin: 0 2px 10px; }
+.deck-h h2 { margin: 0; font-size: 15px; font-weight: 650; }
+.deck-h p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 14px; }
+
+.card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px; min-width: 0; transition: border-color .15s, box-shadow .15s;
+}
+.card.active { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
+.card-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 12px; }
+.card-h h3 { margin: 0; font: 650 15px var(--mono); }
+.tag { color: var(--muted); font-size: 12px; }
+.badge {
+  margin-left: auto; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 99px;
+  background: var(--panel-2); border: 1px solid var(--border-2); color: var(--text);
+}
+.badge.k-normal { color: var(--mant); border-color: color-mix(in srgb, var(--mant) 40%, transparent); }
+.badge.k-subnormal { color: var(--exp); border-color: color-mix(in srgb, var(--exp) 40%, transparent); }
+.badge.k-zero { color: var(--muted); }
+.badge.k-inf { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.badge.k-nan, .badge.k-bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+.badge.k-ok { color: var(--pay); border-color: color-mix(in srgb, var(--pay) 40%, transparent); }
+
+.parts { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 10px; }
+.part {
+  display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 2px 12px;
+  padding: 7px 8px; border-radius: 8px; cursor: default;
+}
+.part:hover { background: var(--panel-2); }
+.part-h { grid-row: span 2; display: flex; flex-direction: column; gap: 1px; font-weight: 600; font-size: 13px; }
+.part-h > span { display: flex; align-items: center; gap: 7px; }
+.part-h em { font-style: normal; font-weight: 400; color: var(--faint); font-size: 11.5px; }
+.pbits { font-size: 13px; letter-spacing: .06em; overflow-wrap: anywhere; word-break: break-all; }
+.pval { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.pval b { color: var(--text); font-weight: 600; }
+@media (max-width: 520px) { .part { grid-template-columns: 1fr; } .part-h { grid-row: auto; flex-direction: row; gap: 8px; align-items: baseline; } }
+
+.c-sign { color: var(--sign); } .c-exp { color: var(--exp); } .c-mant { color: var(--mant); }
+.c-int { color: var(--int); } .c-pay { color: var(--pay); } .c-cont { color: var(--cont); }
+.c-cr { color: var(--red); } .c-cg { color: var(--green); } .c-cb { color: var(--blue); } .c-ca { color: var(--alpha); }
+
+/* color deck */
+.colorbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 2px 12px; }
+.colorbar .lab { font-size: 12px; color: var(--muted); }
+.card.span-all { grid-column: 1 / -1; }
+.swatches { display: grid; gap: 14px; }
+.sw32 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sw565 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 640px) { .sw565 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .sw32 { grid-template-columns: 1fr; } }
+.swatch { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.swatch-h { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+.swatch-h code { color: var(--text); }
+.paint {
+  position: relative; height: 84px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-2);
+  background-color: #2b303a;
+  background-image: linear-gradient(45deg, #3d434f 25%, transparent 25%, transparent 75%, #3d434f 75%),
+                    linear-gradient(45deg, #3d434f 25%, transparent 25%, transparent 75%, #3d434f 75%);
+  background-size: 16px 16px; background-position: 0 0, 8px 8px;
+}
+.paint > i { position: absolute; inset: 0; }
+.pickrow { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.pickrow input[type="text"] { flex: 1; min-width: 0; }
+input[type="color"] { flex: none; width: 38px; height: 30px; padding: 2px; border: 1px solid var(--border); border-radius: 7px; background: var(--inset); cursor: pointer; }
+input[type="range"] { flex: 1; min-width: 0; accent-color: var(--alpha); }
+.chans { display: flex; flex-wrap: wrap; gap: 2px 10px; font: 12px var(--mono); }
+.chans span { cursor: default; }
+.c64ch { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 520px) { .c64ch { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.c-txt { color: var(--txt); } .c-muted { color: var(--muted); } .c-bad { color: var(--bad); }
+
+.formula {
+  background: var(--inset); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; font: 12.5px/1.75 var(--mono); overflow-x: auto;
+}
+.formula .row { display: grid; grid-template-columns: 3.4em minmax(0, 1fr); gap: 8px; white-space: nowrap; }
+.formula .row > :first-child { color: var(--faint); text-align: right; }
+.formula .note { color: var(--muted); white-space: normal; font-family: var(--sans); font-size: 12.5px; line-height: 1.5; }
+.formula .res { color: var(--text); font-weight: 650; }
+sup { font-size: .72em; line-height: 0; }
+
+.exact { margin-top: 10px; display: flex; flex-direction: column; gap: 3px; }
+.exact .lab { font-size: 12px; color: var(--muted); }
+.exact code { font-size: 12px; color: var(--text); overflow-wrap: anywhere; word-break: break-all; max-height: 5.4em; overflow-y: auto; }
+
+.kv { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 6px 12px; margin: 6px 0 12px; font-size: 13px; align-items: baseline; }
+.kv > span { color: var(--muted); font-size: 12px; }
+.kv code { overflow-wrap: anywhere; word-break: break-all; }
+.hint { color: var(--faint); font-size: 12px; margin: 10px 0 0; }
+
+/* text deck */
+.cols8 { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.cell {
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 4px 6px; text-align: center; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+}
+.cell .g { font: 600 18px/1.25 var(--mono); color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell .h { font: 11px var(--mono); color: var(--text); }
+.cell .n { font-size: 10.5px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell.ctrl .g { color: var(--muted); }
+.cell.bad { border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
+.cell.bad .g { color: var(--bad); font-size: 13px; }
+.cell.lead { border-color: color-mix(in srgb, var(--prefix) 40%, var(--border)); }
+@media (max-width: 520px) { .cell .g { font-size: 15px; } .cell .n { display: none; } }
+
+/* varint deck */
+.vstrip .cell .g { font-size: 13px; color: var(--muted); }
+.vstrip .cell.on { border-color: var(--pay); background: color-mix(in srgb, var(--pay) 10%, var(--panel-2)); }
+.vstrip .cell.on .g { color: var(--text); }
+.vstrip .cell.end { box-shadow: inset 0 -3px 0 var(--pay); }
+.tablewrap { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; font: 12.5px var(--mono); }
+th { text-align: left; font: 600 11.5px var(--sans); color: var(--muted); padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tr[data-bytes]:hover td { background: var(--panel-2); }
+.empty { color: var(--faint); font-style: italic; font-family: var(--sans); }
+.warn { color: var(--warn); font-size: 12.5px; margin: 8px 0 0; }
+.zz { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.zz span { font: 11.5px var(--mono); padding: 2px 7px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
+.zz span.on { color: #0a0d13; background: var(--pay); border-color: var(--pay); }
+
+footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
+</style>
+</head>
+<body data-lens="i64" data-view="all">
+<div class="wrap">
+  <header>
+    <div class="titlebar">
+      <h1>Bitwise <small>one 8-byte ArrayBuffer · every view live</small></h1>
+      <div class="nav">
+      <div class="tabs" role="tablist" id="tabs" aria-label="Bit coloring lens">
+        <button role="tab" data-tab="i32">i32 / u32</button>
+        <button role="tab" data-tab="i64">i64 / u64</button>
+        <button role="tab" data-tab="f32">f32</button>
+        <button role="tab" data-tab="f64">f64</button>
+        <button role="tab" data-tab="text">Text</button>
+        <button role="tab" data-tab="varint">Varint</button>
+        <button role="tab" data-tab="color">Color</button>
+      </div>
+      <div class="seg" id="viewSeg" title="Show only the cards for the current lens, or every card">
+        <button type="button" data-view="all" class="on">All</button>
+        <button type="button" data-view="focus">Focused</button>
+      </div>
+      </div>
+    </div>
+  </header>
+
+    <section class="stream" aria-label="Universal bitstream">
+      <div class="stream-bar">
+        <div class="legend" id="legend"></div>
+        <div class="seg" id="orderSeg" title="Display order of bytes in the grid">
+          <button type="button" data-order="be" class="on">Big-endian<span class="long"> · MSB first</span></button>
+          <button type="button" data-order="le">Little-endian<span class="long"> · LSB first</span></button>
+        </div>
+      </div>
+      <div class="bytes" id="bytes"></div>
+    </section>
+
+    <section class="toolbar" aria-label="Buffer tools">
+      <div class="stream-foot">
+        <label class="hexrow"><span class="lab" id="hexLab">Bytes (hex, MSB first)</span><input type="text" id="hexAll" spellcheck="false" autocomplete="off"></label>
+        <div class="ops" id="ops">
+          <button class="btn" data-op="zero" title="Set all bits to 0">Clear</button>
+          <button class="btn" data-op="invert" title="Bitwise NOT">NOT</button>
+          <button class="btn" data-op="shl" title="Shift the u64 left by one">≪ 1</button>
+          <button class="btn" data-op="shr" title="Logical shift the u64 right by one">≫ 1</button>
+          <button class="btn" data-op="inc" title="u64 + 1 (wraps)">+1</button>
+          <button class="btn" data-op="dec" title="u64 − 1 (wraps)">−1</button>
+          <button class="btn" data-op="swap" title="Reverse byte order">Byte swap</button>
+          <button class="btn" data-op="random">Random</button>
+          <select class="btn" id="preset" aria-label="Load a preset"></select>
+        </div>
+      </div>
+    </section>
+
+  <main id="main">
+    <!-- Integers -->
+    <section class="deck" data-deck="int">
+      <div class="deck-h"><h2>Fixed-width integers</h2><p>Two's complement · accepts decimal, 0x…, 0b…, 0o…</p></div>
+      <div class="pair">
+        <article class="card" data-lens="i32" id="card-i32"></article>
+        <article class="card" data-lens="i64" id="card-i64"></article>
+      </div>
+    </section>
+
+    <!-- Floating point -->
+    <section class="deck" data-deck="float">
+      <div class="deck-h"><h2>Floating point</h2><p>IEEE 754 · hover a field to isolate its bits above</p></div>
+      <div class="pair">
+        <article class="card" data-lens="f32" id="card-f32"></article>
+        <article class="card" data-lens="f64" id="card-f64"></article>
+      </div>
+    </section>
+
+    <!-- Text -->
+    <section class="deck" data-deck="text">
+      <div class="deck-h"><h2>Text</h2><p>Bytes in memory order · type text or escapes like \x00 \n \t \\ · unused trailing bytes are zero</p></div>
+      <div class="pair">
+        <article class="card" data-lens="text">
+          <div class="card-h"><h3>ASCII</h3><span class="tag">7-bit · one byte per character</span><span class="badge" id="ascii-badge"></span></div>
+          <div class="fields"><label class="field"><span class="lab">ASCII string</span><input type="text" id="ascii-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label></div>
+          <div class="cols8" id="ascii-cells"></div>
+        </article>
+        <article class="card" data-lens="text">
+          <div class="card-h"><h3>UTF-8</h3><span class="tag">1–4 bytes per code point</span><span class="badge" id="utf8-badge"></span></div>
+          <div class="fields"><label class="field"><span class="lab">UTF-8 string</span><input type="text" id="utf8-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label></div>
+          <div class="cols8" id="utf8-cells"></div>
+          <div class="kv" style="margin-top:12px"><span>TextDecoder</span><code id="utf8-js"></code></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Varint -->
+    <section class="deck" data-deck="varint">
+      <div class="deck-h"><h2>Protobuf varint</h2><p>Little-endian groups of 7 bits, read from B0 until a byte's MSB is 0</p></div>
+      <div class="pair">
+        <article class="card" data-lens="varint">
+          <div class="card-h"><h3>Stream</h3><span class="tag" id="v-len"></span><span class="badge" id="v-badge"></span></div>
+          <div class="cols8 vstrip" id="v-strip"></div>
+          <div class="tablewrap"><table>
+            <thead><tr><th>Byte</th><th>Hex</th><th>MSB · payload</th><th>Shift</th><th>Contribution</th></tr></thead>
+            <tbody id="v-rows"></tbody>
+          </table></div>
+          <div class="formula" id="v-assembled"></div>
+          <p class="warn" id="v-warn" hidden></p>
+        </article>
+        <article class="card" data-lens="varint">
+          <div class="card-h"><h3>Values</h3><span class="tag">uint64 · sint64 (ZigZag)</span></div>
+          <div class="fields">
+            <label class="field"><span class="lab">uint64 (encode → B0…)</span><input type="text" id="vu-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label>
+            <label class="field"><span class="lab">sint64 · ZigZag (encode → B0…)</span><input type="text" id="vz-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label>
+          </div>
+          <div class="formula" id="v-zz"></div>
+          <div class="kv" style="margin-top:12px"><span>ZigZag map</span><div class="zz" id="v-zzmap"></div></div>
+          <p class="hint">Encoding writes only the varint bytes; bytes after the stream are left alone. This buffer holds 8 bytes, so at most 56 payload bits fit (max 2<sup>56</sup> − 1). Real protobuf allows 10 bytes — and a negative <code>int64</code> always takes all 10, which is why <code>sint64</code> uses ZigZag to keep small negatives short.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Color -->
+    <section class="deck" data-deck="color">
+      <div class="deck-h"><h2>Color</h2><p>Packed pixel formats · swatches follow the byte order of the grid above</p></div>
+      <div class="colorbar">
+        <span class="lab">Channel order (packed, MSB → LSB)</span>
+        <div class="seg" id="layoutSeg">
+          <button type="button" data-layout="RGBA" class="on">RGBA</button>
+          <button type="button" data-layout="ARGB">ARGB</button>
+          <button type="button" data-layout="ABGR">ABGR</button>
+        </div>
+        <span class="tag" id="layoutNote"></span>
+      </div>
+      <div class="pair">
+        <article class="card" data-lens="c32">
+          <div class="card-h"><h3>2 × 32-bit</h3><span class="tag">8 bits per channel</span></div>
+          <div class="swatches sw32" id="c32-slots"></div>
+        </article>
+        <article class="card" data-lens="c64">
+          <div class="card-h"><h3>1 × 64-bit</h3><span class="tag">16 bits per channel</span>
+            <div class="seg" id="c64Seg" style="margin-left:auto">
+              <button type="button" data-mode="u16" class="on">RGBA16</button>
+              <button type="button" data-mode="f16">RGBA16F (half float)</button>
+            </div>
+          </div>
+          <div class="swatch" data-bytes="0-7">
+            <div class="swatch-h"><span>B0–B7</span><code id="c64-css"></code></div>
+            <div class="paint"><i id="c64-fill"></i></div>
+            <div class="pickrow">
+              <input type="color" id="c64-pick" aria-label="Pick RGB">
+              <input type="range" id="c64-alpha" min="0" max="1" step="0.001" aria-label="Alpha">
+            </div>
+            <div class="fields c64ch" id="c64-fields"></div>
+          </div>
+          <div class="formula" id="c64-detail"></div>
+        </article>
+        <article class="card span-all" data-lens="c565">
+          <div class="card-h"><h3>4 × 16-bit RGB565</h3><span class="tag">5 red · 6 green · 5 blue — green gets the extra bit because eyes are most sensitive to it</span></div>
+          <div class="swatches sw565" id="c565-slots"></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+'use strict';
+
+/* ═══════════ The single source of truth ═══════════ */
+const buffer = new ArrayBuffer(8);
+const u8  = new Uint8Array(buffer);
+const f32 = new Float32Array(buffer);
+const f64 = new Float64Array(buffer);
+const i32 = new Int32Array(buffer);
+const u32 = new Uint32Array(buffer);
+const i64 = new BigInt64Array(buffer);
+const u64 = new BigUint64Array(buffer);
+const u16 = new Uint16Array(buffer);
+const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
+
+const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
+const DECK_OF = { f32: 'float', f64: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
+const TAB_OF = { c32: 'color', c64: 'color', c565: 'color' };
+Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
+// display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
+const displayOrder = () => (state.order === 'le') === LITTLE ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
+const $ = id => document.getElementById(id);
+
+/* ═══════════ Formatting helpers ═══════════ */
+const hex2 = x => x.toString(16).toUpperCase().padStart(2, '0');
+const bin = (n, w) => n.toString(2).padStart(w, '0');
+const minus = s => String(s).replace(/^-/, '−');
+const fmtBig = n => minus(n.toLocaleString('en-US'));
+const pow2 = e => `2<sup>${minus(e)}</sup>`;
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function f32Shortest(v) {
+  if (Object.is(v, -0)) return '-0';
+  if (!Number.isFinite(v) || v === 0) return String(v);
+  for (let p = 1; p <= 9; p++) {
+    const n = Number(v.toPrecision(p));
+    if (Math.fround(n) === v) return String(n);
+  }
+  return String(v);
+}
+const f64Str = v => Object.is(v, -0) ? '-0' : String(v);
+
+// value = sig × 2^e2, printed exactly
+function exactDecimal(sig, e2) {
+  if (sig === 0n) return '0';
+  if (e2 >= 0) return (sig << BigInt(e2)).toString();
+  const k = -e2;
+  let s = (sig * 5n ** BigInt(k)).toString();
+  if (s.length <= k) s = '0'.repeat(k - s.length + 1) + s;
+  const int = s.slice(0, s.length - k), frac = s.slice(s.length - k).replace(/0+$/, '');
+  return frac ? `${int}.${frac}` : int;
+}
+
+/* ═══════════ Parsers (throw on bad input, return null when empty) ═══════════ */
+function parseIntText(s) {
+  let t = s.trim().replace(/[_,\s]/g, '').toLowerCase();
+  if (!t) return null;
+  let neg = false;
+  if (t[0] === '-' || t[0] === '+') { neg = t[0] === '-'; t = t.slice(1); }
+  if (!/^(0x[0-9a-f]+|0b[01]+|0o[0-7]+|\d+)$/.test(t)) throw new Error('Expected an integer: 123, -5, 0xFF, 0b1010, 0o17');
+  const v = BigInt(t);
+  return neg ? -v : v;
+}
+function parseHexBits(s, width) {
+  const t = s.trim().replace(/[_\s]/g, '').replace(/^0x/i, '');
+  if (!t) return null;
+  if (!/^[0-9a-f]+$/i.test(t)) throw new Error('Expected hex digits');
+  if (t.length > width / 4) throw new Error(`At most ${width / 4} hex digits`);
+  return BigInt('0x' + t);
+}
+function parseFloatText(s) {
+  const t = s.trim().replace(/_/g, '').toLowerCase();
+  if (!t) return null;
+  if (/^\+?(inf|infinity|∞)$/.test(t)) return Infinity;
+  if (/^-(inf|infinity|∞)$/.test(t)) return -Infinity;
+  if (/^[+-]?nan$/.test(t)) return NaN;
+  const v = Number(t);
+  if (Number.isNaN(v)) throw new Error('Expected a number, Infinity or NaN');
+  return v;
+}
+function parseEscaped(str, mode) {
+  const out = [], enc = new TextEncoder();
+  for (let i = 0; i < str.length;) {
+    if (str[i] === '\\') {
+      const n = str[i + 1];
+      if (n === undefined) throw new Error('Dangling backslash');
+      if (n === 'x') {
+        const h = str.slice(i + 2, i + 4);
+        if (!/^[0-9a-f]{2}$/i.test(h)) throw new Error('\\x needs two hex digits');
+        out.push(parseInt(h, 16)); i += 4; continue;
+      }
+      const map = { n: 10, t: 9, r: 13, '0': 0, '\\': 92 };
+      if (n in map) { out.push(map[n]); i += 2; continue; }
+      throw new Error(`Unknown escape \\${n}`);
+    }
+    const cp = str.codePointAt(i);
+    if (mode === 'ascii') {
+      if (cp > 0x7f) throw new Error(`"${String.fromCodePoint(cp)}" is not ASCII — use the UTF-8 field or \\xNN`);
+      out.push(cp);
+    } else {
+      out.push(...enc.encode(String.fromCodePoint(cp)));
+    }
+    i += cp > 0xffff ? 2 : 1;
+  }
+  if (out.length > 8) throw new Error(`${out.length} bytes — the buffer holds 8`);
+  return out;
+}
+
+/* ═══════════ Decoders ═══════════ */
+function decodeUtf8(b) {
+  const segs = [], info = new Array(b.length);
+  let i = 0;
+  while (i < b.length) {
+    const x = b[i];
+    if (x < 0x80) { segs.push({ start: i, len: 1, cp: x }); info[i] = { kind: 'ascii', prefix: 1 }; i++; continue; }
+    let need, cp, min;
+    if (x >= 0xC2 && x <= 0xDF) { need = 1; cp = x & 0x1f; min = 0x80; }
+    else if (x >= 0xE0 && x <= 0xEF) { need = 2; cp = x & 0x0f; min = 0x800; }
+    else if (x >= 0xF0 && x <= 0xF4) { need = 3; cp = x & 0x07; min = 0x10000; }
+    else {
+      const err = x <= 0xBF ? 'stray continuation' : (x <= 0xC1 ? 'overlong lead' : 'invalid lead');
+      segs.push({ start: i, len: 1, cp: null, err }); info[i] = { kind: 'invalid', prefix: 0 }; i++; continue;
+    }
+    let ok = true, err = '';
+    for (let j = 1; j <= need; j++) {
+      if (i + j >= b.length) { ok = false; err = 'truncated'; break; }
+      const c = b[i + j];
+      if ((c & 0xC0) !== 0x80) { ok = false; err = 'missing continuation'; break; }
+      cp = (cp << 6) | (c & 0x3f);
+    }
+    if (ok) {
+      if (cp < min) { ok = false; err = 'overlong'; }
+      else if (cp > 0x10FFFF) { ok = false; err = '> U+10FFFF'; }
+      else if (cp >= 0xD800 && cp <= 0xDFFF) { ok = false; err = 'surrogate'; }
+    }
+    if (ok) {
+      segs.push({ start: i, len: need + 1, cp });
+      info[i] = { kind: 'lead', prefix: need + 2 };
+      for (let j = 1; j <= need; j++) info[i + j] = { kind: 'cont', prefix: 2 };
+      i += need + 1;
+    } else {
+      segs.push({ start: i, len: 1, cp: null, err }); info[i] = { kind: 'invalid', prefix: 0 }; i++;
+    }
+  }
+  return { segs, info };
+}
+
+function decodeVarint(b) {
+  let value = 0n, len = 0, complete = false;
+  const steps = [];
+  for (let i = 0; i < b.length; i++) {
+    const byte = b[i], payload = byte & 0x7f, shift = 7 * i;
+    value |= BigInt(payload) << BigInt(shift);
+    steps.push({ i, byte, payload, shift, more: (byte & 0x80) !== 0 });
+    len = i + 1;
+    if (!(byte & 0x80)) { complete = true; break; }
+  }
+  return { value, len, complete, steps };
+}
+function encodeVarint(n) {
+  const out = [];
+  do {
+    let b = Number(n & 0x7fn);
+    n >>= 7n;
+    if (n) b |= 0x80;
+    out.push(b);
+  } while (n);
+  return out;
+}
+const zigzagDecode = n => (n >> 1n) ^ -(n & 1n);
+const zigzagEncode = n => n >= 0n ? n << 1n : (-n << 1n) - 1n;
+
+/* ═══════════ Lens definitions (bit coloring) ═══════════ */
+const ROLE_NAMES = {
+  sign: 'sign', exp: 'exponent', mant: 'mantissa', int: 'value bit', txt: 'code-point payload',
+  prefix: 'UTF-8 marker', bad: 'invalid UTF-8', cont: 'continuation flag', pay: 'varint payload', unused: 'not in view',
+  cr: 'red', cg: 'green', cb: 'blue', ca: 'alpha',
+};
+const LEGENDS = {
+  f32: [['sign', 'Sign'], ['exp', 'Exponent (8)'], ['mant', 'Mantissa (23)'], ['unused', 'Outside f32 (B4–B7)']],
+  f64: [['sign', 'Sign'], ['exp', 'Exponent (11)'], ['mant', 'Mantissa (52)']],
+  i32: [['sign', 'Sign bit (2³¹ weight)'], ['int', 'Value bits'], ['unused', 'Outside i32 (B4–B7)']],
+  i64: [['sign', 'Sign bit (2⁶³ weight)'], ['int', 'Value bits']],
+  text: [['prefix', 'UTF-8 marker bits (0 / 110 / 1110 / 11110 / 10)'], ['txt', 'Code-point payload'], ['bad', 'Invalid byte']],
+  varint: [['cont', 'Continuation (MSB)'], ['pay', '7-bit payload'], ['unused', 'Not in stream']],
+  c32: [['cr', 'Red'], ['cg', 'Green'], ['cb', 'Blue'], ['ca', 'Alpha'], ['', '8 bits each · 2 pixels']],
+  c64: [['cr', 'Red'], ['cg', 'Green'], ['cb', 'Blue'], ['ca', 'Alpha'], ['', '16 bits each · 1 pixel']],
+  c565: [['cr', 'Red (5)'], ['cg', 'Green (6)'], ['cb', 'Blue (5)'], ['', '4 pixels']],
+};
+
+// position of (byte b, bit k) inside an n-byte native-endian number
+const valueBit = (b, k, n) => (LITTLE ? b : n - 1 - b) * 8 + k;
+
+function roleOf(b, k, d) {
+  switch (state.lens) {
+    case 'f32': { if (b >= 4) return 'unused'; const v = valueBit(b, k, 4); return v === 31 ? 'sign' : v >= 23 ? 'exp' : 'mant'; }
+    case 'f64': { const v = valueBit(b, k, 8); return v === 63 ? 'sign' : v >= 52 ? 'exp' : 'mant'; }
+    case 'i32': { if (b >= 4) return 'unused'; return valueBit(b, k, 4) === 31 ? 'sign' : 'int'; }
+    case 'i64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
+    case 'text': { const inf = d.utf8.info[b]; if (inf.kind === 'invalid') return 'bad'; return k >= 8 - inf.prefix ? 'prefix' : 'txt'; }
+    case 'varint': if (b >= d.varint.len) return 'unused'; return k === 7 ? 'cont' : 'pay';
+    case 'c32': { const w = b >> 2; return CH_ROLE[state.colorLayout[3 - (valueBit(b - 4 * w, k, 4) >> 3)]]; }
+    case 'c64': return CH_ROLE[state.colorLayout[3 - (valueBit(b, k, 8) >> 4)]];
+    case 'c565': { const w = b >> 1, v = valueBit(b - 2 * w, k, 2); return v >= 11 ? 'cr' : v >= 5 ? 'cg' : 'cb'; }
+  }
+}
+
+function byteNote(b, d) {
+  const range = n => { const lo = valueBit(b, 0, n); return `[${lo + 7}:${lo}]`; };
+  switch (state.lens) {
+    case 'f32': case 'i32': return b < 4 ? range(4) : '—';
+    case 'f64': case 'i64': return range(8);
+    case 'text': {
+      const x = u8[b], k = d.utf8.info[b].kind;
+      if (k === 'ascii') return x > 0x20 && x < 0x7f ? `'${String.fromCharCode(x)}'` : (CTRL[x] || 'DEL');
+      return k === 'invalid' ? 'bad' : k;
+    }
+    case 'varint': return b < d.varint.len ? (d.varint.steps[b].more ? 'more →' : 'end') : '—';
+    case 'c32': { const w = b >> 2; return `px${w} ${state.colorLayout[3 - (valueBit(b - 4 * w, 0, 4) >> 3)]}`; }
+    case 'c64': { const v = valueBit(b, 0, 8); return `${state.colorLayout[3 - (v >> 4)]} ${v % 16 ? 'hi' : 'lo'}`; }
+    case 'c565': { const w = b >> 1; return `px${w} ${valueBit(b - 2 * w, 0, 2) ? 'hi' : 'lo'}`; }
+  }
+}
+
+/* ═══════════ Bit grid ═══════════ */
+const byteEls = [], bitEls = [];
+let renderedOrder = null;
+
+function buildGrid() {
+  const host = $('bytes');
+  for (let b = 0; b < 8; b++) {
+    const g = document.createElement('div');
+    g.className = 'byte';
+    const bits = document.createElement('div');
+    bits.className = 'byte-bits';
+    bitEls[b] = [];
+    for (let k = 7; k >= 0; k--) {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'bit';
+      el.dataset.b = b; el.dataset.k = k;
+      bits.appendChild(el);
+      bitEls[b][k] = el;
+    }
+    const meta = document.createElement('div');
+    meta.className = 'byte-meta';
+    meta.innerHTML = `<span>B${b}</span><span class="bhex"></span><span class="bnote"></span>`;
+    g.append(bits, meta);
+    host.appendChild(g);
+    byteEls[b] = g;
+  }
+
+  // click toggles; press-and-drag paints the same value across bits
+  let paint = null;
+  const setBit = (t, v) => {
+    const b = +t.dataset.b, k = +t.dataset.k;
+    u8[b] = v ? u8[b] | (1 << k) : u8[b] & ~(1 << k);
+  };
+  host.addEventListener('pointerdown', e => {
+    const t = e.target.closest('.bit');
+    if (!t || e.button !== 0) return;
+    e.preventDefault();
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') document.activeElement.blur();
+    paint = ((u8[t.dataset.b] >> t.dataset.k) & 1) ^ 1;
+    setBit(t, paint);
+    update();
+  });
+  host.addEventListener('pointerover', e => {
+    if (paint === null) return;
+    const t = e.target.closest('.bit');
+    if (!t) return;
+    setBit(t, paint);
+    update();
+  });
+  window.addEventListener('pointerup', () => { paint = null; });
+  host.addEventListener('click', e => { // keyboard activation only (mouse handled by pointerdown)
+    const t = e.target.closest('.bit');
+    if (!t || e.detail !== 0) return;
+    u8[t.dataset.b] ^= 1 << t.dataset.k;
+    update();
+  });
+}
+
+function renderGrid(d) {
+  const host = $('bytes');
+  if (renderedOrder !== state.order) {
+    displayOrder().forEach(b => host.appendChild(byteEls[b]));
+    renderedOrder = state.order;
+  }
+  const numeric = ['f32', 'f64', 'i32', 'i64'].includes(state.lens);
+  const width = state.lens === 'f32' || state.lens === 'i32' ? 4 : 8;
+  for (let b = 0; b < 8; b++) {
+    for (let k = 0; k < 8; k++) {
+      const el = bitEls[b][k], on = (u8[b] >> k) & 1, role = roleOf(b, k, d);
+      el.className = `bit r-${role}${on ? ' on' : ''}`;
+      el.textContent = on;
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
+      const vb = numeric && b < width ? ` · value bit ${valueBit(b, k, width)}` : '';
+      el.title = `B${b} bit ${k}${vb} · ${ROLE_NAMES[role]} · ${on}`;
+    }
+    const g = byteEls[b];
+    g.querySelector('.bhex').textContent = hex2(u8[b]);
+    g.querySelector('.bnote').textContent = byteNote(b, d);
+    g.classList.toggle('in-varint', b < d.varint.len);
+  }
+}
+
+function renderLegend() {
+  $('legend').innerHTML = LEGENDS[state.lens]
+    .map(([r, l]) => r ? `<span class="chip"><i class="sw r-${r}"></i>${l}</span>` : `<span class="chip">${l}</span>`).join('');
+}
+
+function renderLens() {
+  const d = derive();
+  document.body.dataset.lens = state.lens;
+  renderGrid(d);
+  renderLegend();
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === (TAB_OF[state.lens] || state.lens)));
+  document.querySelectorAll('.card[data-lens]').forEach(c => c.classList.toggle('active', c.dataset.lens === state.lens));
+  document.querySelectorAll('.deck[data-deck]').forEach(s => s.classList.toggle('current', s.dataset.deck === DECK_OF[state.lens]));
+  document.body.dataset.view = state.view;
+  const hostHl = $('bytes');
+  if (state.hl) hostHl.dataset.hl = state.hl; else delete hostHl.dataset.hl;
+}
+
+/* ═══════════ Card skeletons ═══════════ */
+function floatCard(p, E, M, bytes) {
+  const bias = (1 << (E - 1)) - 1;
+  const fld = (id, lab) => `<label class="field"><span class="lab">${lab}</span><input type="text" id="${id}" spellcheck="false" autocomplete="off"><small class="msg"></small></label>`;
+  const part = (role, name, sub, id) => `
+    <div class="part" data-hl="${role}">
+      <div class="part-h"><span><i class="sw r-${role}"></i>${name}</span><em>${sub}</em></div>
+      <code class="pbits c-${role}" id="${p}-${id}b"></code>
+      <div class="pval" id="${p}-${id}v"></div>
+    </div>`;
+  return `
+    <div class="card-h"><h3>${p}</h3><span class="tag">binary${1 + E + M} · ${bytes}</span><span class="badge" id="${p}-kind"></span></div>
+    <div class="fields">${fld(`${p}-val`, 'Value')}${fld(`${p}-hex`, 'Bit pattern (hex)')}</div>
+    <div class="parts">
+      ${part('sign', 'Sign', '1 bit', 's')}
+      ${part('exp', 'Exponent', `${E} bits · bias ${bias}`, 'e')}
+      ${part('mant', 'Mantissa', `${M} bits`, 'm')}
+    </div>
+    <div class="formula" id="${p}-formula"></div>
+    <div class="exact"><span class="lab">Exact stored value</span><code id="${p}-exact"></code></div>`;
+}
+function intCard(w, bytes) {
+  const fld = (id, lab) => `<label class="field"><span class="lab">${lab}</span><input type="text" id="${id}" spellcheck="false" autocomplete="off"><small class="msg"></small></label>`;
+  const max = (1n << BigInt(w - 1)) - 1n;
+  return `
+    <div class="card-h"><h3>i${w} · u${w}</h3><span class="tag">${bytes}</span><span class="badge" id="i${w}-badge"></span></div>
+    <div class="fields">${fld(`i${w}-s`, `i${w} (signed)`)}${fld(`i${w}-u`, `u${w} (unsigned)`)}</div>
+    <div class="kv">
+      <span>Hex</span><code id="i${w}-hex"></code>
+      <span>Binary</span><code id="i${w}-bin"></code>
+    </div>
+    <div class="formula" id="i${w}-explain"></div>
+    <p class="hint">i${w}: ${fmtBig(-max - 1n)} … ${fmtBig(max)} · u${w}: 0 … ${fmtBig((1n << BigInt(w)) - 1n)}</p>`;
+}
+
+/* ═══════════ Renderers ═══════════ */
+function setVal(el, v, src) {
+  if (el === src) return;
+  el.value = v;
+  el.classList.remove('invalid');
+  const msg = el.parentElement.querySelector('.msg');
+  if (msg) msg.textContent = '';
+}
+const row = (l, r, cls = '') => `<div class="row"><span>${l}</span><span class="${cls}">${r}</span></div>`;
+
+function renderFloat(p, src) {
+  const is32 = p === 'f32';
+  const E = is32 ? 8 : 11, M = is32 ? 23 : 52;
+  const bits = is32 ? BigInt(u32[0]) : u64[0];
+  const val = is32 ? f32[0] : f64[0];
+  const bias = (1 << (E - 1)) - 1, eMax = (1 << E) - 1;
+  const sign = Number(bits >> BigInt(E + M));
+  const exp = Number((bits >> BigInt(M)) & BigInt(eMax));
+  const mant = bits & ((1n << BigInt(M)) - 1n);
+  const kind = exp === eMax ? (mant === 0n ? 'inf' : 'nan') : exp === 0 ? (mant === 0n ? 'zero' : 'subnormal') : 'normal';
+  const quiet = (mant >> BigInt(M - 1)) & 1n;
+
+  setVal($(`${p}-val`), is32 ? f32Shortest(val) : f64Str(val), src);
+  setVal($(`${p}-hex`), '0x' + bits.toString(16).toUpperCase().padStart(M === 23 ? 8 : 16, '0'), src);
+
+  const badge = $(`${p}-kind`);
+  badge.className = `badge k-${kind}`;
+  badge.textContent = { normal: 'Normal', subnormal: 'Subnormal', zero: sign ? 'Zero (−0)' : 'Zero (+0)', inf: sign ? '−Infinity' : '+Infinity', nan: quiet ? 'NaN (quiet)' : 'NaN (signaling)' }[kind];
+
+  $(`${p}-sb`).textContent = sign;
+  $(`${p}-sv`).innerHTML = kind === 'nan' ? `${sign} → ignored for NaN` : `${sign} → <b>${sign ? 'negative (−)' : 'positive (+)'}</b>`;
+  $(`${p}-eb`).textContent = bin(exp, E);
+  $(`${p}-ev`).innerHTML =
+    kind === 'normal' ? `raw <b>${exp}</b> − bias ${bias} = <b>${minus(exp - bias)}</b>` :
+    kind === 'subnormal' ? `raw <b>0</b> → subnormal, fixed exponent 1 − ${bias} = <b>${minus(1 - bias)}</b>` :
+    kind === 'zero' ? `raw <b>0</b> (all zeros) → zero / subnormal range` :
+    `raw <b>${exp}</b> (all ones) → special value`;
+  $(`${p}-mb`).textContent = bin(mant, M);
+  const frac = Number(mant) / 2 ** M; // exact: M ≤ 52
+  $(`${p}-mv`).innerHTML = kind === 'nan'
+    ? `0x${mant.toString(16).toUpperCase()} · top bit ${quiet} → <b>${quiet ? 'quiet' : 'signaling'}</b> · payload 0x${(mant & ((1n << BigInt(M - 1)) - 1n)).toString(16).toUpperCase()}`
+    : `0x${mant.toString(16).toUpperCase()} = ${fmtBig(mant)} → fraction <b>${frac}</b>`;
+
+  const S = `<span class="c-sign">s</span>`, Ee = `<span class="c-exp">e</span>`, Mm = `<span class="c-mant">m</span>`;
+  const s1 = `(−1)<sup class="c-sign">${sign}</sup>`;
+  let html;
+  if (kind === 'normal') {
+    const sig = 1 + frac;
+    html = row('value', `= (−1)<sup>${S}</sup> × 2<sup>${Ee} − ${bias}</sup> × (1 + ${Mm} / ${pow2(M)})`) +
+      row('', `= ${s1} × 2<sup><span class="c-exp">${exp}</span> − ${bias}</sup> × (1 + <span class="c-mant">${mant}</span> / ${pow2(M)})`) +
+      row('', `= ${sign ? '−1' : '+1'} × ${pow2(exp - bias)} × ${sig}`) +
+      row('', `= ${minus(f64Str(val))}`, 'res');
+  } else if (kind === 'subnormal') {
+    html = row('value', `= (−1)<sup>${S}</sup> × 2<sup>1 − ${bias}</sup> × (0 + ${Mm} / ${pow2(M)})`) +
+      row('', `= ${s1} × ${pow2(1 - bias)} × (0 + <span class="c-mant">${mant}</span> / ${pow2(M)})`) +
+      row('', `= ${sign ? '−1' : '+1'} × ${pow2(1 - bias)} × ${frac}`) +
+      row('', `= ${minus(f64Str(val))}`, 'res') +
+      row('', `No implicit leading 1: subnormals trade precision for gradual underflow toward 0.`, 'note');
+  } else if (kind === 'zero') {
+    html = row('value', `= ${sign ? '−0' : '+0'}`, 'res') +
+      row('', `Exponent and mantissa are all zeros. The sign is kept, so +0 and −0 are different bit patterns but compare equal (1/−0 = −∞).`, 'note');
+  } else if (kind === 'inf') {
+    html = row('value', `= ${sign ? '−∞' : '+∞'}`, 'res') +
+      row('', `Exponent all ones (${eMax}) with mantissa 0 encodes infinity — the result of overflow or x / 0.`, 'note');
+  } else {
+    html = row('value', `= NaN`, 'res') +
+      row('', `Exponent all ones (${eMax}) with a non-zero mantissa. The mantissa's top bit marks a ${quiet ? '<b>quiet</b> NaN (propagates silently)' : '<b>signaling</b> NaN (would trap on use)'}; the remaining bits are a payload. NaN ≠ NaN.`, 'note');
+  }
+  $(`${p}-formula`).innerHTML = html;
+
+  const exact = $(`${p}-exact`);
+  if (kind === 'normal' || kind === 'subnormal') {
+    const sigInt = kind === 'normal' ? mant | (1n << BigInt(M)) : mant;
+    const e2 = (kind === 'normal' ? exp : 1) - bias - M;
+    const s = exactDecimal(sigInt, e2);
+    exact.textContent = (sign ? '−' : '') + s;
+    exact.title = `${s.replace('.', '').replace(/^0+/, '').length} significant digits`;
+  } else {
+    exact.textContent = kind === 'zero' ? (sign ? '−0' : '0') : kind === 'inf' ? (sign ? '−∞' : '+∞') : 'NaN';
+    exact.title = '';
+  }
+}
+
+function renderInt(w, src) {
+  const W = BigInt(w);
+  const u = w === 32 ? BigInt(u32[0]) : u64[0];
+  const s = w === 32 ? BigInt(i32[0]) : i64[0];
+  setVal($(`i${w}-s`), s.toString(), src);
+  setVal($(`i${w}-u`), u.toString(), src);
+  $(`i${w}-hex`).textContent = '0x' + u.toString(16).toUpperCase().padStart(w / 4, '0');
+  const b = bin(u, w);
+  // sign bit, then the remaining 7 bits of the top byte, then whole bytes
+  const rest = b.slice(1);
+  const bytesStr = [rest.slice(0, 7), ...rest.slice(7).match(/.{8}/g)].join(' ');
+  $(`i${w}-bin`).innerHTML = `<span class="c-sign" data-hl="sign">${b[0]}</span><span class="c-int" data-hl="int">${bytesStr}</span>`;
+
+  const sb = u >> (W - 1n), mag = u & ((1n << (W - 1n)) - 1n);
+  const badge = $(`i${w}-badge`);
+  badge.className = 'badge ' + (sb ? 'k-inf' : 'k-ok');
+  badge.textContent = sb ? 'sign bit set' : 'sign bit clear';
+  $(`i${w}-explain`).innerHTML = sb
+    ? row('i' + w, `= −<span class="c-sign">${pow2(w - 1)}</span> + <span class="c-int">${fmtBig(mag)}</span> = ${fmtBig(s)}`, 'res') +
+      row('u' + w, `= +<span class="c-sign">${pow2(w - 1)}</span> + <span class="c-int">${fmtBig(mag)}</span> = ${fmtBig(u)}`) +
+      row('|i|', `= ~bits + 1 = ${fmtBig(-s)} &nbsp;<span class="c-muted">(two's complement negation)</span>`)
+    : row('i' + w, `= <span class="c-int">${fmtBig(mag)}</span>`, 'res') +
+      row('u' + w, `= <span class="c-int">${fmtBig(u)}</span>`) +
+      row('', 'Sign bit is 0, so the signed and unsigned readings agree.', 'note');
+}
+
+const CTRL = ['NUL', 'SOH', 'STX', 'ETX', 'EOT', 'ENQ', 'ACK', 'BEL', 'BS', 'TAB', 'LF', 'VT', 'FF', 'CR', 'SO', 'SI',
+  'DLE', 'DC1', 'DC2', 'DC3', 'DC4', 'NAK', 'SYN', 'ETB', 'CAN', 'EM', 'SUB', 'ESC', 'FS', 'GS', 'RS', 'US'];
+
+function cpGlyph(cp) {
+  if (cp < 0x20) return { g: String.fromCharCode(0x2400 + cp), n: CTRL[cp], ctrl: true };
+  if (cp === 0x20) return { g: '␠', n: 'space', ctrl: true };
+  if (cp === 0x7f) return { g: '␡', n: 'DEL', ctrl: true };
+  if (cp >= 0x80 && cp < 0xa0) return { g: '⍰', n: 'C1 control', ctrl: true };
+  return { g: String.fromCodePoint(cp), n: '' };
+}
+function escapeChar(cp, bytes) {
+  if (cp === 0x5c) return '\\\\';
+  if (cp === 10) return '\\n';
+  if (cp === 9) return '\\t';
+  if (cp === 13) return '\\r';
+  if (cp < 0x20 || cp === 0x7f || (cp >= 0x80 && cp < 0xa0)) return bytes.map(x => '\\x' + hex2(x)).join('');
+  return String.fromCodePoint(cp);
+}
+const usedEnd = () => { let e = 8; while (e > 0 && u8[e - 1] === 0) e--; return e; };
+
+function renderText(d, src) {
+  const end = usedEnd();
+  // ASCII
+  let asc = '', nonAscii = 0;
+  const acells = [];
+  for (let b = 0; b < 8; b++) {
+    const x = u8[b];
+    if (b < end) asc += x < 0x80 ? escapeChar(x, [x]) : '\\x' + hex2(x);
+    let cls = 'cell', g, n;
+    if (x >= 0x80) { cls += ' bad'; g = `\\x${hex2(x)}`; n = 'not ASCII'; nonAscii++; }
+    else { const c = cpGlyph(x); g = c.g; n = c.n || `dec ${x}`; if (c.ctrl) cls += ' ctrl'; }
+    acells.push(`<div class="${cls}" data-bytes="${b}-${b}" title="B${b} = 0x${hex2(x)}"><span class="g">${esc(g)}</span><span class="h">${hex2(x)}</span><span class="n">${esc(n)}</span></div>`);
+  }
+  $('ascii-cells').innerHTML = acells.join('');
+  setVal($('ascii-in'), asc, src);
+  const ab = $('ascii-badge');
+  ab.className = 'badge ' + (nonAscii ? 'k-bad' : 'k-ok');
+  ab.textContent = nonAscii ? `${nonAscii} byte${nonAscii > 1 ? 's' : ''} ≥ 0x80` : 'valid ASCII';
+
+  // UTF-8
+  let str = '', bad = 0;
+  const ucells = [];
+  for (const seg of d.utf8.segs) {
+    const bytes = Array.from(u8.subarray(seg.start, seg.start + seg.len));
+    const hx = bytes.map(hex2).join(' ');
+    const range = `${seg.start}-${seg.start + seg.len - 1}`;
+    if (seg.cp === null) {
+      bad++;
+      if (seg.start < end) str += '\\x' + hex2(bytes[0]);
+      ucells.push(`<div class="cell bad" data-bytes="${range}" style="grid-column:span 1" title="B${seg.start}: ${seg.err}"><span class="g">�</span><span class="h">${hx}</span><span class="n">${seg.err}</span></div>`);
+    } else {
+      if (seg.start < end) str += escapeChar(seg.cp, bytes);
+      const c = cpGlyph(seg.cp);
+      const u = 'U+' + seg.cp.toString(16).toUpperCase().padStart(4, '0');
+      ucells.push(`<div class="cell${c.ctrl ? ' ctrl' : ''}${seg.len > 1 ? ' lead' : ''}" data-bytes="${range}" style="grid-column:span ${seg.len}" title="${u} · ${seg.len} byte${seg.len > 1 ? 's' : ''}: ${hx}"><span class="g">${esc(c.g)}</span><span class="h">${u}</span><span class="n">${seg.len > 1 ? `${seg.len}-byte · ${hx}` : esc(c.n || hx)}</span></div>`);
+    }
+  }
+  $('utf8-cells').innerHTML = ucells.join('');
+  setVal($('utf8-in'), str, src);
+  const ub = $('utf8-badge');
+  ub.className = 'badge ' + (bad ? 'k-bad' : 'k-ok');
+  ub.textContent = bad ? `${bad} invalid byte${bad > 1 ? 's' : ''}` : `valid · ${d.utf8.segs.length} code point${d.utf8.segs.length > 1 ? 's' : ''}`;
+  $('utf8-js').textContent = JSON.stringify(new TextDecoder('utf-8').decode(u8));
+}
+
+function renderVarint(d, src) {
+  const v = d.varint;
+  $('v-strip').innerHTML = Array.from(u8, (x, b) => {
+    const on = b < v.len, last = on && b === v.len - 1 && v.complete;
+    return `<div class="cell${on ? ' on' : ''}${last ? ' end' : ''}" data-bytes="${b}-${b}"><span class="g">${hex2(x)}</span><span class="h">B${b}</span><span class="n">${on ? (v.steps[b].more ? 'more' : 'end') : '—'}</span></div>`;
+  }).join('');
+  $('v-len').textContent = `${v.len} byte${v.len > 1 ? 's' : ''} consumed`;
+  const badge = $('v-badge');
+  badge.className = 'badge ' + (v.complete ? 'k-ok' : 'k-bad');
+  badge.textContent = v.complete ? 'complete' : 'truncated';
+
+  $('v-rows').innerHTML = v.steps.map(s => {
+    const b = bin(s.byte, 8);
+    return `<tr data-bytes="${s.i}-${s.i}"><td>B${s.i}</td><td>0x${hex2(s.byte)}</td>` +
+      `<td><span class="c-cont" data-hl="cont">${b[0]}</span> <span class="c-pay" data-hl="pay">${b.slice(1)}</span> <span class="c-muted">${s.more ? 'more' : 'stop'}</span></td>` +
+      `<td>≪ ${s.shift}</td><td>${fmtBig(BigInt(s.payload) << BigInt(s.shift))}</td></tr>`;
+  }).join('');
+
+  const groups = v.steps.slice().reverse().map((s, i) => `<span class="${i % 2 ? 'c-pay' : 'c-txt'}">${bin(s.payload, 7)}</span>`).join(' ');
+  $('v-assembled').innerHTML =
+    row('groups', `${groups} <span class="c-muted">(last byte first)</span>`) +
+    row('uint', `= 0x${v.value.toString(16).toUpperCase()} = ${fmtBig(v.value)}`, 'res');
+  const warn = $('v-warn');
+  warn.hidden = v.complete;
+  warn.textContent = v.complete ? '' : 'All 8 bytes have their continuation bit set — the varint never terminates inside this buffer, so the value above is partial.';
+
+  const z = zigzagDecode(v.value);
+  setVal($('vu-in'), v.value.toString(), src);
+  setVal($('vz-in'), z.toString(), src);
+  const odd = v.value & 1n;
+  $('v-zz').innerHTML =
+    row('zigzag', `= (n ≫ 1) ⊕ −(n & 1)`) +
+    row('', `= (${fmtBig(v.value)} ≫ 1) ⊕ −${odd} = ${fmtBig(v.value >> 1n)} ⊕ ${odd ? '−1' : '0'}`) +
+    row('sint', `= ${fmtBig(z)}`, 'res') +
+    row('', odd ? `n is odd → −(n + 1) / 2` : `n is even → n / 2`, 'note');
+  const map = [];
+  for (let k = 0n; k < 9n; k++) map.push(`<span class="${k === v.value ? 'on' : ''}">${minus(zigzagDecode(k))}→${k}</span>`);
+  $('v-zzmap').innerHTML = map.join('');
+}
+
+function renderHexAll(src) {
+  setVal($('hexAll'), displayOrder().map(b => hex2(u8[b])).join(' '), src);
+  $('hexLab').textContent = state.order === 'be' ? 'Bytes (hex, MSB first)' : 'Bytes (hex, LSB first)';
+}
+
+function derive() { return { utf8: decodeUtf8(u8), varint: decodeVarint(u8) }; }
+
+function update(src = null) {
+  const d = derive();
+  renderHexAll(src);
+  renderFloat('f32', src);
+  renderFloat('f64', src);
+  renderInt(32, src);
+  renderInt(64, src);
+  renderText(d, src);
+  renderVarint(d, src);
+  renderColor(src);
+  renderLens();
+}
+
+/* ═══════════ Input → buffer bindings ═══════════ */
+function bind(id, parse, write) {
+  const el = $(id), msg = el.parentElement.querySelector('.msg');
+  const setMsg = t => { if (msg) msg.textContent = t; else el.title = t; };
+  el.addEventListener('input', () => {
+    let v;
+    try {
+      v = parse(el.value);
+      if (v === null) { el.classList.remove('invalid'); setMsg(''); return; }
+      write(v);
+    } catch (e) {
+      el.classList.add('invalid');
+      setMsg(e.message);
+      return;
+    }
+    el.classList.remove('invalid');
+    setMsg('');
+    update(el);
+  });
+  el.addEventListener('blur', () => update()); // re-format from the buffer
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') el.blur(); });
+}
+
+function intRange(v, w) {
+  const W = BigInt(w);
+  if (v < -(1n << (W - 1n)) || v > (1n << W) - 1n) throw new Error(`Out of range for ${w}-bit`);
+  return BigInt.asUintN(w, v);
+}
+function writeBytes(arr) { u8.fill(0); u8.set(arr); }
+
+function bindAll() {
+  bind('f32-val', parseFloatText, v => { f32[0] = v; });
+  bind('f64-val', parseFloatText, v => { f64[0] = v; });
+  bind('f32-hex', s => parseHexBits(s, 32), v => { u32[0] = Number(v); });
+  bind('f64-hex', s => parseHexBits(s, 64), v => { u64[0] = v; });
+  bind('i32-s', parseIntText, v => { u32[0] = Number(intRange(v, 32)); });
+  bind('i32-u', parseIntText, v => { u32[0] = Number(intRange(v, 32)); });
+  bind('i64-s', parseIntText, v => { u64[0] = intRange(v, 64); });
+  bind('i64-u', parseIntText, v => { u64[0] = intRange(v, 64); });
+  bind('ascii-in', s => parseEscaped(s, 'ascii'), writeBytes);
+  bind('utf8-in', s => parseEscaped(s, 'utf8'), writeBytes);
+  bind('hexAll', s => {
+    const t = s.replace(/0x/gi, '').replace(/[\s,_:]/g, '');
+    if (!/^[0-9a-f]*$/i.test(t)) throw new Error('Expected hex bytes, e.g. 3F F0 00 …');
+    if (t.length % 2) throw new Error('Odd number of hex digits');
+    if (t.length > 16) throw new Error('At most 8 bytes');
+    return t.match(/../g) ? t.match(/../g).map(h => parseInt(h, 16)) : [];
+  }, bytes => {
+    // short input is a number: pad toward the most significant end
+    const pad = Array(8 - bytes.length).fill(0);
+    const full = state.order === 'be' ? pad.concat(bytes) : bytes.concat(pad);
+    displayOrder().forEach((b, i) => { u8[b] = full[i]; });
+  });
+  const writeVarint = n => {
+    const bytes = encodeVarint(n);
+    if (bytes.length > 8) throw new Error(`Needs ${bytes.length} bytes — max here is 2^56 − 1`);
+    u8.set(bytes, 0);
+  };
+  bind('vu-in', parseIntText, v => {
+    if (v < 0n) throw new Error('uint64 cannot be negative — use the ZigZag field');
+    writeVarint(v);
+  });
+  bind('vz-in', parseIntText, v => writeVarint(zigzagEncode(v)));
+}
+
+/* ═══════════ Color ═══════════ */
+const CH_ROLE = { R: 'cr', G: 'cg', B: 'cb', A: 'ca' };
+const LAYOUT_NOTES = {
+  RGBA: '0xRRGGBBAA — the same order as CSS #RRGGBBAA hex colors',
+  ARGB: '0xAARRGGBB — Android, Java and .NET color ints; also DXGI B8G8R8A8 pixel bytes read on little-endian',
+  ABGR: '0xAABBGGRR — canvas ImageData / WebGL R,G,B,A bytes read as a u32 on little-endian',
+};
+
+// half-precision float (1 sign, 5 exponent, 10 mantissa bits; bias 15)
+function fromHalf(h) {
+  const s = h & 0x8000 ? -1 : 1, e = (h >> 10) & 31, m = h & 0x3ff;
+  if (e === 31) return m ? NaN : s * Infinity;
+  return e === 0 ? s * m * 2 ** -24 : s * (1 + m / 1024) * 2 ** (e - 15);
+}
+function toHalf(v) {
+  if (Number.isNaN(v)) return 0x7e00;
+  const sign = v < 0 || Object.is(v, -0) ? 0x8000 : 0;
+  v = Math.abs(v);
+  if (v >= 65520) return sign | 0x7c00; // rounds past the largest half (65504)
+  if (v < 2 ** -14) return sign | Math.round(v / 2 ** -24); // subnormal (may round up into the smallest normal)
+  let e = Math.floor(Math.log2(v));
+  if (2 ** e > v) e--; // guard log2 rounding
+  let m = Math.round((v / 2 ** e - 1) * 1024);
+  if (m === 1024) { m = 0; e++; }
+  return e + 15 >= 31 ? sign | 0x7c00 : sign | ((e + 15) << 10) | m;
+}
+function halfStr(h) {
+  if (h === 0x8000) return '-0';
+  const v = fromHalf(h);
+  if (!Number.isFinite(v)) return String(v);
+  for (let p = 1; p <= 6; p++) { const n = Number(v.toPrecision(p)); if (toHalf(n) === h) return String(n); }
+  return String(v);
+}
+const toSrgb = c => c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+const toLinear = c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+const clamp01 = x => Number.isNaN(x) ? 0 : Math.min(1, Math.max(0, x));
+const rgbHex = (r, g, b) => '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+const parsePick = v => [1, 3, 5].map(i => parseInt(v.slice(i, i + 2), 16));
+
+function unpack32(v, L) { const c = {}; [...L].forEach((k, i) => { c[k] = (v >>> ((3 - i) * 8)) & 255; }); return c; }
+function pack32(c, L) { return [...L].reduce((v, k, i) => v | (c[k] << ((3 - i) * 8)), 0) >>> 0; }
+function unpack64() { const c = {}, u = u64[0]; [...state.colorLayout].forEach((k, i) => { c[k] = Number((u >> BigInt((3 - i) * 16)) & 0xFFFFn); }); return c; }
+function pack64(c) { u64[0] = [...state.colorLayout].reduce((u, k, i) => u | (BigInt(c[k] & 0xFFFF) << BigInt((3 - i) * 16)), 0n); }
+function unpack565(v) {
+  const r = v >> 11, g = (v >> 5) & 63, b = v & 31;
+  return { r, g, b, R: (r << 3) | (r >> 2), G: (g << 2) | (g >> 4), B: (b << 3) | (b >> 2) };
+}
+
+function buildColor() {
+  $('c32-slots').innerHTML = [0, 1].map(w => `
+    <div class="swatch" id="c32-slot-${w}" data-bytes="${4 * w}-${4 * w + 3}">
+      <div class="swatch-h"><span>px${w} · B${4 * w}–B${4 * w + 3}</span><code id="c32-css-${w}" title="CSS hex (always RRGGBBAA)"></code></div>
+      <div class="paint"><i id="c32-fill-${w}"></i></div>
+      <div class="pickrow">
+        <input type="color" id="c32-pick-${w}" aria-label="Pick RGB for pixel ${w}">
+        <input type="range" id="c32-alpha-${w}" min="0" max="255" step="1" aria-label="Alpha for pixel ${w}">
+      </div>
+      <label class="field"><span class="lab" id="c32-lab-${w}"></span><input type="text" id="c32-hex-${w}" spellcheck="false" autocomplete="off"><small class="msg"></small></label>
+      <div class="chans" id="c32-ch-${w}"></div>
+    </div>`).join('');
+  $('c64-fields').innerHTML = [...'RGBA'].map(k => `
+    <label class="field" data-hl="${CH_ROLE[k]}"><span class="lab c-${CH_ROLE[k]}" id="c64-lab-${k}">${k}</span><input type="text" id="c64-ch-${k}" spellcheck="false" autocomplete="off"><small class="msg"></small></label>`).join('');
+  $('c565-slots').innerHTML = [0, 1, 2, 3].map(w => `
+    <div class="swatch" id="c565-slot-${w}" data-bytes="${2 * w}-${2 * w + 1}">
+      <div class="swatch-h"><span>px${w} · B${2 * w}–B${2 * w + 1}</span></div>
+      <div class="paint"><i id="c565-fill-${w}"></i></div>
+      <div class="pickrow">
+        <input type="color" id="c565-pick-${w}" aria-label="Pick color for pixel ${w}">
+        <input type="text" id="c565-hex-${w}" spellcheck="false" autocomplete="off" aria-label="Packed hex for pixel ${w}">
+      </div>
+      <div class="chans" id="c565-ch-${w}"></div>
+    </div>`).join('');
+}
+
+function renderColor(src) {
+  const L = state.colorLayout, order = displayOrder();
+  $('layoutNote').textContent = LAYOUT_NOTES[L];
+  document.querySelectorAll('#layoutSeg button').forEach(b => b.classList.toggle('on', b.dataset.layout === L));
+  document.querySelectorAll('#c64Seg button').forEach(b => b.classList.toggle('on', b.dataset.mode === state.c64mode));
+
+  // 2 × 32-bit
+  for (let w = 0; w < 2; w++) {
+    const v = u32[w], c = unpack32(v, L);
+    $(`c32-slot-${w}`).style.order = order.indexOf(4 * w);
+    $(`c32-fill-${w}`).style.background = `rgb(${c.R} ${c.G} ${c.B} / ${(c.A / 255).toFixed(3)})`;
+    $(`c32-css-${w}`).textContent = '#' + [c.R, c.G, c.B, c.A].map(hex2).join('');
+    $(`c32-lab-${w}`).textContent = `Packed u32 (0x${[...L].map(k => k + k).join('')})`;
+    setVal($(`c32-hex-${w}`), '0x' + v.toString(16).toUpperCase().padStart(8, '0'), src);
+    setVal($(`c32-pick-${w}`), rgbHex(c.R, c.G, c.B), src);
+    setVal($(`c32-alpha-${w}`), c.A, src);
+    $(`c32-ch-${w}`).innerHTML = [...'RGBA'].map(k => `<span class="c-${CH_ROLE[k]}" data-hl="${CH_ROLE[k]}">${k} ${c[k]}</span>`).join('');
+  }
+
+  // 1 × 64-bit
+  const raw = unpack64(), f = state.c64mode === 'f16';
+  const val = {};
+  for (const k of 'RGBA') val[k] = f ? fromHalf(raw[k]) : raw[k] / 65535;
+  // RGBA16 is stored sRGB-encoded (like a 16-bit PNG); half floats are linear light
+  const shown = k => k === 'A' ? clamp01(val[k]) : clamp01(f ? toSrgb(clamp01(val[k])) : val[k]);
+  const s8 = k => Math.round(shown(k) * 255);
+  $('c64-fill').style.background = `rgb(${s8('R')} ${s8('G')} ${s8('B')} / ${shown('A').toFixed(3)})`;
+  $('c64-css').textContent = '#' + [s8('R'), s8('G'), s8('B'), s8('A')].map(hex2).join('');
+  setVal($('c64-pick'), rgbHex(s8('R'), s8('G'), s8('B')), src);
+  setVal($('c64-alpha'), shown('A'), src);
+  for (const k of 'RGBA') {
+    $(`c64-lab-${k}`).textContent = f ? `${k} (half float)` : `${k} (0–65535)`;
+    setVal($(`c64-ch-${k}`), f ? halfStr(raw[k]) : String(raw[k]), src);
+  }
+  const clipped = [...'RGBA'].some(k => !(val[k] >= 0 && val[k] <= 1));
+  $('c64-detail').innerHTML = [...'RGBA'].map(k => {
+    const h = raw[k], hx = '0x' + h.toString(16).toUpperCase().padStart(4, '0'), lab = `<span class="c-${CH_ROLE[k]}">${k}</span>`;
+    if (!f) return row(lab, `${hx} = ${h} / 65535 = ${(h / 65535).toFixed(4)}`);
+    const b = bin(h, 16);
+    return row(lab, `<span class="c-sign">${b[0]}</span> <span class="c-exp">${b.slice(1, 6)}</span> <span class="c-mant">${b.slice(6)}</span> = ${hx} → ${minus(halfStr(h))}`);
+  }).join('') + row('', f
+    ? `Half float: 1 sign, 5 exponent (bias 15) and 10 mantissa bits — same layout idea as f32/f64. Channels are linear light, sRGB-encoded for display.${clipped ? ' <b>Some values are outside 0–1 (HDR or invalid) and are clamped in the swatch.</b>' : ''}`
+    : `Each channel is a 16-bit unsigned integer; 65535 is full intensity. Used by 16-bit PNGs and photo editors.`, 'note');
+
+  // 4 × RGB565
+  for (let w = 0; w < 4; w++) {
+    const v = u16[w], c = unpack565(v), b = bin(v, 16);
+    $(`c565-slot-${w}`).style.order = order.indexOf(2 * w);
+    $(`c565-fill-${w}`).style.background = `rgb(${c.R} ${c.G} ${c.B})`;
+    setVal($(`c565-pick-${w}`), rgbHex(c.R, c.G, c.B), src);
+    setVal($(`c565-hex-${w}`), '0x' + v.toString(16).toUpperCase().padStart(4, '0'), src);
+    $(`c565-ch-${w}`).innerHTML =
+      `<span class="c-cr" data-hl="cr">${b.slice(0, 5)}</span><span class="c-cg" data-hl="cg">${b.slice(5, 11)}</span><span class="c-cb" data-hl="cb">${b.slice(11)}</span>` +
+      `<span class="c-muted" style="flex-basis:100%">R ${c.r}/31 · G ${c.g}/63 · B ${c.b}/31</span>`;
+  }
+}
+
+function bindColor() {
+  const live = (el, write) => el.addEventListener('input', () => { write(el.value); update(el); });
+  for (let w = 0; w < 2; w++) {
+    live($(`c32-pick-${w}`), v => { const c = unpack32(u32[w], state.colorLayout); [c.R, c.G, c.B] = parsePick(v); u32[w] = pack32(c, state.colorLayout); });
+    live($(`c32-alpha-${w}`), v => { const c = unpack32(u32[w], state.colorLayout); c.A = +v; u32[w] = pack32(c, state.colorLayout); });
+    bind(`c32-hex-${w}`, s => parseHexBits(s, 32), v => { u32[w] = Number(v); });
+  }
+  const enc = x => state.c64mode === 'f16' ? toHalf(x) : Math.round(clamp01(x) * 65535);
+  live($('c64-pick'), v => {
+    const c = unpack64(), rgb = parsePick(v).map(x => x / 255);
+    [c.R, c.G, c.B] = rgb.map(x => enc(state.c64mode === 'f16' ? toLinear(x) : x));
+    pack64(c);
+  });
+  live($('c64-alpha'), v => { const c = unpack64(); c.A = enc(+v); pack64(c); });
+  for (const k of 'RGBA') {
+    bind(`c64-ch-${k}`, s => {
+      if (state.c64mode === 'f16') { const v = parseFloatText(s); return v === null ? null : toHalf(v); }
+      const v = parseIntText(s);
+      if (v === null) return null;
+      if (v < 0n || v > 65535n) throw new Error('0 … 65535');
+      return Number(v);
+    }, h => { const c = unpack64(); c[k] = h; pack64(c); });
+  }
+  for (let w = 0; w < 4; w++) {
+    live($(`c565-pick-${w}`), v => {
+      const [R, G, B] = parsePick(v);
+      u16[w] = (Math.round(R * 31 / 255) << 11) | (Math.round(G * 63 / 255) << 5) | Math.round(B * 31 / 255);
+    });
+    bind(`c565-hex-${w}`, s => parseHexBits(s, 16), v => { u16[w] = Number(v); });
+  }
+  $('layoutSeg').addEventListener('click', e => {
+    const t = e.target.closest('[data-layout]');
+    if (t) { state.colorLayout = t.dataset.layout; update(); }
+  });
+  $('c64Seg').addEventListener('click', e => {
+    const t = e.target.closest('[data-mode]');
+    if (t) { state.c64mode = t.dataset.mode; update(); }
+  });
+}
+
+/* ═══════════ Toolbar, presets, lens interaction ═══════════ */
+const OPS = {
+  zero: () => u8.fill(0),
+  invert: () => { for (let i = 0; i < 8; i++) u8[i] ^= 0xff; },
+  shl: () => { u64[0] = BigInt.asUintN(64, u64[0] << 1n); },
+  shr: () => { u64[0] >>= 1n; },
+  inc: () => { u64[0] = BigInt.asUintN(64, u64[0] + 1n); },
+  dec: () => { u64[0] = BigInt.asUintN(64, u64[0] - 1n); },
+  swap: () => u8.reverse(),
+  random: () => crypto.getRandomValues(u8),
+};
+
+const utf8Bytes = s => Array.from(new TextEncoder().encode(s));
+const PRESETS = [
+  ['i32', [
+    ['0x5F3759DF (fast inverse sqrt)', () => { u8.fill(0); u32[0] = 0x5F3759DF; }],
+    ['INT32_MIN', () => { u8.fill(0); i32[0] = -2147483648; }],
+    ['INT32_MAX', () => { u8.fill(0); i32[0] = 2147483647; }],
+    ['−1 (= UINT32_MAX)', () => { u8.fill(0); i32[0] = -1; }],
+    ['0', () => { u8.fill(0); }],
+  ]],
+  ['i64', [
+    ['0x0123456789ABCDEF', () => { u64[0] = 0x0123456789ABCDEFn; }],
+    ['INT64_MIN', () => { i64[0] = -(1n << 63n); }],
+    ['INT64_MAX', () => { i64[0] = (1n << 63n) - 1n; }],
+    ['−1 (= UINT64_MAX)', () => { i64[0] = -1n; }],
+    ['0', () => { u8.fill(0); }],
+  ]],
+  ['f32', [
+    ['π', () => { u8.fill(0); f32[0] = Math.PI; }],
+    ['e', () => { u8.fill(0); f32[0] = Math.E; }],
+    ['0.1 (not exact)', () => { u8.fill(0); f32[0] = 0.1; }],
+    ['Smallest subnormal', () => { u8.fill(0); u32[0] = 1; }],
+    ['Signaling NaN', () => { u8.fill(0); u32[0] = 0x7FA00001; }],
+    ['−∞', () => { u8.fill(0); f32[0] = -Infinity; }],
+  ]],
+  ['f64', [
+    ['π', () => { f64[0] = Math.PI; }],
+    ['e', () => { f64[0] = Math.E; }],
+    ['0.1 (not exact)', () => { f64[0] = 0.1; }],
+    ['1.0', () => { f64[0] = 1; }],
+    ['−0', () => { f64[0] = -0; }],
+    ['+∞', () => { f64[0] = Infinity; }],
+    ['NaN (quiet)', () => { f64[0] = NaN; }],
+    ['Smallest subnormal', () => { u64[0] = 1n; }],
+    ['Largest finite', () => { f64[0] = Number.MAX_VALUE; }],
+  ]],
+  ['text', [
+    ['ASCII "Hi!\\n"', () => writeBytes(utf8Bytes('Hi!\n'))],
+    ['UTF-8 "€😀"', () => writeBytes(utf8Bytes('€😀'))],
+    ['UTF-8 "héllo"', () => writeBytes(utf8Bytes('héllo'))],
+    ['Invalid UTF-8', () => writeBytes([0x41, 0xC3, 0x28, 0xE2, 0x82, 0xFF, 0x80, 0x42])],
+  ]],
+  ['varint', [
+    ['uint 300 (AC 02)', () => writeBytes(encodeVarint(300n))],
+    ['sint −1000 (ZigZag)', () => writeBytes(encodeVarint(zigzagEncode(-1000n)))],
+    ['Max: 2⁵⁶ − 1', () => writeBytes(encodeVarint((1n << 56n) - 1n))],
+    ['Truncated (all MSBs set)', () => writeBytes([0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80])],
+  ]],
+  ['color', [
+    ['RGBA: orange + half-transparent teal', () => { state.colorLayout = 'RGBA'; u32[0] = 0xFF8C1AFF; u32[1] = 0x1ABC9C80; }, 'c32'],
+    ['Canvas bytes R,G,B,A (read as ABGR)', () => { state.colorLayout = 'ABGR'; writeBytes([0xFF, 0x8C, 0x1A, 0xFF, 0x1A, 0xBC, 0x9C, 0x80]); }, 'c32'],
+    ['RGB565: red, green, blue, white', () => { u16[0] = 0xF800; u16[1] = 0x07E0; u16[2] = 0x001F; u16[3] = 0xFFFF; }, 'c565'],
+    ['RGBA16: 50% gray', () => { state.c64mode = 'u16'; pack64({ R: 0x8000, G: 0x8000, B: 0x8000, A: 0xFFFF }); }, 'c64'],
+    ['RGBA16F: HDR orange (red = 4.0)', () => { state.c64mode = 'f16'; pack64({ R: toHalf(4), G: toHalf(0.5), B: toHalf(0.05), A: toHalf(1) }); }, 'c64'],
+  ]],
+];
+
+function setupControls() {
+  const sel = $('preset');
+  sel.innerHTML = '<option value="">Presets…</option>' + PRESETS.map(([lens, items], gi) =>
+    `<optgroup label="${lens}">${items.map(([name], ii) => `<option value="${gi}:${ii}">${esc(name)}</option>`).join('')}</optgroup>`).join('');
+  sel.addEventListener('change', () => {
+    if (!sel.value) return;
+    const [gi, ii] = sel.value.split(':').map(Number);
+    const [lens, items] = PRESETS[gi];
+    items[ii][1]();
+    state.lens = items[ii][2] || lens;
+    sel.value = '';
+    update();
+  });
+
+  $('ops').addEventListener('click', e => {
+    const op = e.target.closest('[data-op]');
+    if (!op) return;
+    OPS[op.dataset.op]();
+    update();
+  });
+
+  $('tabs').addEventListener('click', e => {
+    const t = e.target.closest('[data-tab]');
+    if (!t) return;
+    state.lens = t.dataset.tab === 'color' ? 'c32' : t.dataset.tab;
+    renderLens();
+  });
+
+  $('orderSeg').addEventListener('click', e => {
+    const t = e.target.closest('[data-order]');
+    if (!t) return;
+    state.order = t.dataset.order;
+    document.querySelectorAll('#orderSeg button').forEach(b => b.classList.toggle('on', b === t));
+    update();
+  });
+
+  $('viewSeg').addEventListener('click', e => {
+    const t = e.target.closest('[data-view]');
+    if (!t) return;
+    state.view = t.dataset.view;
+    syncViewSeg();
+    renderLens();
+  });
+
+  // interacting with a card makes it the active lens
+  const main = $('main');
+  const activate = e => {
+    const c = e.target.closest('[data-lens]');
+    if (c && c.dataset.lens !== state.lens) { state.lens = c.dataset.lens; renderLens(); }
+  };
+  main.addEventListener('pointerdown', activate);
+  main.addEventListener('focusin', activate);
+
+  // hovering a field isolates its bits; hovering a byte-backed element outlines those bytes
+  let peeked = [];
+  main.addEventListener('mouseover', e => {
+    const h = e.target.closest('[data-hl]');
+    const hl = h ? h.dataset.hl : null;
+    if (hl !== state.hl) {
+      state.hl = hl;
+      const l = h && h.closest('[data-lens]');
+      if (l && l.dataset.lens !== state.lens) state.lens = l.dataset.lens;
+      renderLens();
+    }
+    const p = e.target.closest('[data-bytes]');
+    peeked.forEach(b => byteEls[b].classList.remove('peek'));
+    peeked = [];
+    if (p) {
+      const [a, z] = p.dataset.bytes.split('-').map(Number);
+      for (let b = a; b <= z; b++) { byteEls[b].classList.add('peek'); peeked.push(b); }
+    }
+  });
+  main.addEventListener('mouseleave', () => {
+    peeked.forEach(b => byteEls[b].classList.remove('peek'));
+    peeked = [];
+    if (state.hl) { state.hl = null; renderLens(); }
+  });
+}
+
+function syncViewSeg() {
+  document.querySelectorAll('#viewSeg button').forEach(b => b.classList.toggle('on', b.dataset.view === state.view));
+}
+
+/* ═══════════ Boot ═══════════ */
+syncViewSeg();
+$('card-f32').innerHTML = floatCard('f32', 8, 23, 'bytes B0–B3');
+$('card-f64').innerHTML = floatCard('f64', 11, 52, 'bytes B0–B7');
+$('card-i32').innerHTML = intCard(32, 'bytes B0–B3');
+$('card-i64').innerHTML = intCard(64, 'bytes B0–B7');
+$('foot').textContent = `Host byte order: ${LITTLE ? 'little' : 'big'}-endian. TypedArray views use native order, so B0 (the lowest address) holds the ${LITTLE ? 'least' : 'most'} significant byte of each number. Big-endian is also network byte order.`;
+
+buildGrid();
+buildColor();
+bindAll();
+bindColor();
+setupControls();
+u64[0] = 0x0123456789ABCDEFn;
+update();
+</script>
+</body>
+</html>

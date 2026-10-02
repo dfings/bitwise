@@ -256,6 +256,7 @@ sup { font-size: .72em; line-height: 0; }
 .kv > span { color: var(--muted); font-size: 12px; }
 .kv code { overflow-wrap: anywhere; word-break: break-all; }
 .hint { color: var(--faint); font-size: 12px; margin: 10px 0 0; }
+.hint:empty { display: none; }
 
 /* text deck */
 .cols8 { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
@@ -302,6 +303,8 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
         <button role="tab" data-tab="i64">i64 / u64</button>
         <button role="tab" data-tab="f32">f32</button>
         <button role="tab" data-tab="f64">f64</button>
+        <button role="tab" data-tab="f16">f16</button>
+        <button role="tab" data-tab="bf16">bf16</button>
         <button role="tab" data-tab="text">Text</button>
         <button role="tab" data-tab="varint">Varint</button>
         <button role="tab" data-tab="color">Color</button>
@@ -358,6 +361,8 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
       <div class="pair">
         <article class="card" data-lens="f32" id="card-f32"></article>
         <article class="card" data-lens="f64" id="card-f64"></article>
+        <article class="card" data-lens="f16" id="card-f16"></article>
+        <article class="card" data-lens="bf16" id="card-bf16"></article>
       </div>
     </section>
 
@@ -468,7 +473,7 @@ const u16 = new Uint16Array(buffer);
 const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
-const DECK_OF = { f32: 'float', f64: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
+const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
 const TAB_OF = { c32: 'color', c64: 'color', c565: 'color' };
 Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
 // display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
@@ -633,6 +638,8 @@ const ROLE_NAMES = {
 const LEGENDS = {
   f32: [['sign', 'Sign'], ['exp', 'Exponent (8)'], ['mant', 'Mantissa (23)'], ['unused', 'Outside f32 (B4–B7)']],
   f64: [['sign', 'Sign'], ['exp', 'Exponent (11)'], ['mant', 'Mantissa (52)']],
+  f16: [['sign', 'Sign'], ['exp', 'Exponent (5)'], ['mant', 'Mantissa (10)'], ['unused', 'Outside f16 (B2–B7)']],
+  bf16: [['sign', 'Sign'], ['exp', 'Exponent (8)'], ['mant', 'Mantissa (7)'], ['unused', 'Outside bf16 (B2–B7)']],
   i32: [['sign', 'Sign bit (2³¹ weight)'], ['int', 'Value bits'], ['unused', 'Outside i32 (B4–B7)']],
   i64: [['sign', 'Sign bit (2⁶³ weight)'], ['int', 'Value bits']],
   text: [['prefix', 'UTF-8 marker bits (0 / 110 / 1110 / 11110 / 10)'], ['txt', 'Code-point payload'], ['bad', 'Invalid byte']],
@@ -649,6 +656,7 @@ function roleOf(b, k, d) {
   switch (state.lens) {
     case 'f32': { if (b >= 4) return 'unused'; const v = valueBit(b, k, 4); return v === 31 ? 'sign' : v >= 23 ? 'exp' : 'mant'; }
     case 'f64': { const v = valueBit(b, k, 8); return v === 63 ? 'sign' : v >= 52 ? 'exp' : 'mant'; }
+    case 'f16': case 'bf16': { if (b >= 2) return 'unused'; const v = valueBit(b, k, 2), M = state.lens === 'f16' ? 10 : 7; return v === 15 ? 'sign' : v >= M ? 'exp' : 'mant'; }
     case 'i32': { if (b >= 4) return 'unused'; return valueBit(b, k, 4) === 31 ? 'sign' : 'int'; }
     case 'i64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
     case 'text': { const inf = d.utf8.info[b]; if (inf.kind === 'invalid') return 'bad'; return k >= 8 - inf.prefix ? 'prefix' : 'txt'; }
@@ -664,6 +672,7 @@ function byteNote(b, d) {
   switch (state.lens) {
     case 'f32': case 'i32': return b < 4 ? range(4) : '—';
     case 'f64': case 'i64': return range(8);
+    case 'f16': case 'bf16': return b < 2 ? range(2) : '—';
     case 'text': {
       const x = u8[b], k = d.utf8.info[b].kind;
       if (k === 'ascii') return x > 0x20 && x < 0x7f ? `'${String.fromCharCode(x)}'` : (CTRL[x] || 'DEL');
@@ -778,17 +787,17 @@ function renderLens() {
 }
 
 /* ═══════════ Card skeletons ═══════════ */
-function floatCard(p, E, M, bytes) {
+function floatCard(p, E, M, bytes, extra = '') {
   const bias = (1 << (E - 1)) - 1;
   const fld = (id, lab) => `<label class="field"><span class="lab">${lab}</span><input type="text" id="${id}" spellcheck="false" autocomplete="off"><small class="msg"></small></label>`;
   const part = (role, name, sub, id) => `
     <div class="part" data-hl="${role}">
-      <div class="part-h"><span><i class="sw r-${role}"></i>${name}</span><em>${sub}</em></div>
+      <div class="part-h"><span><i class="sw r-${role}"></i>${name}</span><em id="${p}-${id}sub">${sub}</em></div>
       <code class="pbits c-${role}" id="${p}-${id}b"></code>
       <div class="pval" id="${p}-${id}v"></div>
     </div>`;
   return `
-    <div class="card-h"><h3>${p}</h3><span class="tag">binary${1 + E + M} · ${bytes}</span><span class="badge" id="${p}-kind"></span></div>
+    <div class="card-h"><h3 id="${p}-title">${p}</h3><span class="tag" id="${p}-tag">${p === 'bf16' ? 'bfloat16' : `binary${1 + E + M}`} · ${bytes}</span>${extra}<span class="badge" id="${p}-kind"></span></div>
     <div class="fields">${fld(`${p}-val`, 'Value')}${fld(`${p}-hex`, 'Bit pattern (hex)')}</div>
     <div class="parts">
       ${part('sign', 'Sign', '1 bit', 's')}
@@ -796,7 +805,8 @@ function floatCard(p, E, M, bytes) {
       ${part('mant', 'Mantissa', `${M} bits`, 'm')}
     </div>
     <div class="formula" id="${p}-formula"></div>
-    <div class="exact"><span class="lab">Exact stored value</span><code id="${p}-exact"></code></div>`;
+    <div class="exact"><span class="lab">Exact stored value</span><code id="${p}-exact"></code></div>
+    <p class="hint" id="${p}-note"></p>`;
 }
 function intCard(w, bytes) {
   const fld = (id, lab) => `<label class="field"><span class="lab">${lab}</span><input type="text" id="${id}" spellcheck="false" autocomplete="off"><small class="msg"></small></label>`;
@@ -822,11 +832,15 @@ function setVal(el, v, src) {
 }
 const row = (l, r, cls = '') => `<div class="row"><span>${l}</span><span class="${cls}">${r}</span></div>`;
 
+function floatSpec(p) {
+  if (p === 'f32') return { E: 8, M: 23, bits: BigInt(u32[0]), val: f32[0], str: f32Shortest(f32[0]) };
+  if (p === 'f64') return { E: 11, M: 52, bits: u64[0], val: f64[0], str: f64Str(f64[0]) };
+  const fmt = p === 'f16' ? F16 : BF16, h = u16[0];
+  return { ...fmt, bits: BigInt(h), val: decodeSmall(h, fmt), str: smallStr(h, fmt) };
+}
+
 function renderFloat(p, src) {
-  const is32 = p === 'f32';
-  const E = is32 ? 8 : 11, M = is32 ? 23 : 52;
-  const bits = is32 ? BigInt(u32[0]) : u64[0];
-  const val = is32 ? f32[0] : f64[0];
+  const { E, M, bits, val, str } = floatSpec(p);
   const bias = (1 << (E - 1)) - 1, eMax = (1 << E) - 1;
   const sign = Number(bits >> BigInt(E + M));
   const exp = Number((bits >> BigInt(M)) & BigInt(eMax));
@@ -834,8 +848,11 @@ function renderFloat(p, src) {
   const kind = exp === eMax ? (mant === 0n ? 'inf' : 'nan') : exp === 0 ? (mant === 0n ? 'zero' : 'subnormal') : 'normal';
   const quiet = (mant >> BigInt(M - 1)) & 1n;
 
-  setVal($(`${p}-val`), is32 ? f32Shortest(val) : f64Str(val), src);
-  setVal($(`${p}-hex`), '0x' + bits.toString(16).toUpperCase().padStart(M === 23 ? 8 : 16, '0'), src);
+  setVal($(`${p}-val`), str, src);
+  setVal($(`${p}-hex`), '0x' + bits.toString(16).toUpperCase().padStart((1 + E + M) / 4, '0'), src);
+  $(`${p}-esub`).textContent = `${E} bits · bias ${bias}`;
+  $(`${p}-msub`).textContent = `${M} bits`;
+  if (SMALL_NOTES[p]) renderSmallNote(p);
 
   const badge = $(`${p}-kind`);
   badge.className = `badge k-${kind}`;
@@ -1038,6 +1055,8 @@ function update(src = null) {
   renderHexAll(src);
   renderFloat('f32', src);
   renderFloat('f64', src);
+  renderFloat('f16', src);
+  renderFloat('bf16', src);
   renderInt(32, src);
   renderInt(64, src);
   renderText(d, src);
@@ -1119,31 +1138,40 @@ const LAYOUT_NOTES = {
   ABGR: '0xAABBGGRR — canvas ImageData / WebGL R,G,B,A bytes read as a u32 on little-endian',
 };
 
-// half-precision float (1 sign, 5 exponent, 10 mantissa bits; bias 15)
-function fromHalf(h) {
-  const s = h & 0x8000 ? -1 : 1, e = (h >> 10) & 31, m = h & 0x3ff;
-  if (e === 31) return m ? NaN : s * Infinity;
-  return e === 0 ? s * m * 2 ** -24 : s * (1 + m / 1024) * 2 ** (e - 15);
+// 16-bit floats: f16 (IEEE half: 5 exponent / 10 mantissa bits) and bf16 (bfloat16: 8 / 7)
+const F16 = { E: 5, M: 10 }, BF16 = { E: 8, M: 7 };
+function decodeSmall(h, { E, M }) {
+  const bias = (1 << (E - 1)) - 1, emax = (1 << E) - 1;
+  const s = (h >> (E + M)) & 1 ? -1 : 1, e = (h >> M) & emax, m = h & ((1 << M) - 1);
+  if (e === emax) return m ? NaN : s * Infinity;
+  return e === 0 ? s * m * 2 ** (1 - bias - M) : s * (1 + m / 2 ** M) * 2 ** (e - bias);
 }
-function toHalf(v) {
-  if (Number.isNaN(v)) return 0x7e00;
-  const sign = v < 0 || Object.is(v, -0) ? 0x8000 : 0;
+function encodeSmall(v, { E, M }) { // round to nearest, ties to even
+  const bias = (1 << (E - 1)) - 1, emax = (1 << E) - 1;
+  if (Number.isNaN(v)) return (emax << M) | (1 << (M - 1));
+  const sign = v < 0 || Object.is(v, -0) ? 1 << (E + M) : 0;
   v = Math.abs(v);
-  if (v >= 65520) return sign | 0x7c00; // rounds past the largest half (65504)
-  if (v < 2 ** -14) return sign | Math.round(v / 2 ** -24); // subnormal (may round up into the smallest normal)
-  let e = Math.floor(Math.log2(v));
-  if (2 ** e > v) e--; // guard log2 rounding
-  let m = Math.round((v / 2 ** e - 1) * 1024);
-  if (m === 1024) { m = 0; e++; }
-  return e + 15 >= 31 ? sign | 0x7c00 : sign | ((e + 15) << 10) | m;
+  if (v === Infinity) return sign | (emax << M);
+  const eMin = 1 - bias;
+  let e = v === 0 ? eMin : Math.max(eMin, Math.floor(Math.log2(v)));
+  if (e > eMin && 2 ** e > v) e--; // guard log2 rounding
+  if (2 ** (e + 1) <= v) e++;
+  const q = v / 2 ** (e - M), fl = Math.floor(q), fr = q - fl; // exact: power-of-two scaling
+  let r = fr > 0.5 || (fr === 0.5 && fl % 2) ? fl + 1 : fl;
+  if (r === 2 ** (M + 1)) { r /= 2; e++; }
+  if (r < 2 ** M) return sign | r; // subnormal or zero
+  return e + bias >= emax ? sign | (emax << M) : sign | ((e + bias) << M) | (r - 2 ** M);
 }
-function halfStr(h) {
-  if (h === 0x8000) return '-0';
-  const v = fromHalf(h);
+function smallStr(h, fmt) {
+  if (h === 1 << (fmt.E + fmt.M)) return '-0';
+  const v = decodeSmall(h, fmt);
   if (!Number.isFinite(v)) return String(v);
-  for (let p = 1; p <= 6; p++) { const n = Number(v.toPrecision(p)); if (toHalf(n) === h) return String(n); }
+  for (let p = 1; p <= 9; p++) { const n = Number(v.toPrecision(p)); if (encodeSmall(n, fmt) === h) return String(n); }
   return String(v);
 }
+const fromHalf = h => decodeSmall(h, F16);
+const toHalf = v => encodeSmall(v, F16);
+const halfStr = h => smallStr(h, F16);
 const toSrgb = c => c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
 const toLinear = c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 const clamp01 = x => Number.isNaN(x) ? 0 : Math.min(1, Math.max(0, x));
@@ -1282,6 +1310,22 @@ function bindColor() {
   });
 }
 
+/* ═══════════ 16-bit float cards (f16, bf16 over B0–B1) ═══════════ */
+const SMALL_NOTES = {
+  f16: 'Half precision: ~3–4 significant digits, and anything above 65,504 overflows to ∞. Used for HDR images, textures and GPU math.',
+  bf16: 'bfloat16 keeps f32’s full 8-bit exponent (same range, up to ~3.4 × 10<sup>38</sup>) but only 7 mantissa bits (~2–3 digits) — it is exactly the top 16 bits of an f32. Used for machine-learning training.',
+};
+function renderSmallNote(p) {
+  $(`${p}-note`).innerHTML = SMALL_NOTES[p];
+}
+
+function bindSmallFloats() {
+  for (const [p, fmt] of [['f16', F16], ['bf16', BF16]]) {
+    bind(`${p}-val`, parseFloatText, v => { u16[0] = encodeSmall(v, fmt); });
+    bind(`${p}-hex`, s => parseHexBits(s, 16), v => { u16[0] = Number(v); });
+  }
+}
+
 /* ═══════════ Toolbar, presets, lens interaction ═══════════ */
 const OPS = {
   zero: () => u8.fill(0),
@@ -1328,6 +1372,16 @@ const PRESETS = [
     ['NaN (quiet)', () => { f64[0] = NaN; }],
     ['Smallest subnormal', () => { u64[0] = 1n; }],
     ['Largest finite', () => { f64[0] = Number.MAX_VALUE; }],
+  ]],
+  ['f16', [
+    ['1.0', () => { u8.fill(0); u16[0] = toHalf(1); }],
+    ['0.1 (not exact)', () => { u8.fill(0); u16[0] = toHalf(0.1); }],
+    ['65504 (largest finite)', () => { u8.fill(0); u16[0] = toHalf(65504); }],
+    ['Smallest subnormal', () => { u8.fill(0); u16[0] = 1; }],
+  ]],
+  ['bf16', [
+    ['π', () => { u8.fill(0); u16[0] = encodeSmall(Math.PI, BF16); }],
+    ['3 × 10³⁸ (f16 would overflow)', () => { u8.fill(0); u16[0] = encodeSmall(3e38, BF16); }],
   ]],
   ['text', [
     ['ASCII "Hi!\\n"', () => writeBytes(utf8Bytes('Hi!\n'))],
@@ -1437,6 +1491,8 @@ function syncViewSeg() {
 syncViewSeg();
 $('card-f32').innerHTML = floatCard('f32', 8, 23, 'bytes B0–B3');
 $('card-f64').innerHTML = floatCard('f64', 11, 52, 'bytes B0–B7');
+$('card-f16').innerHTML = floatCard('f16', 5, 10, 'bytes B0–B1');
+$('card-bf16').innerHTML = floatCard('bf16', 8, 7, 'bytes B0–B1');
 $('card-i32').innerHTML = intCard(32, 'bytes B0–B3');
 $('card-i64').innerHTML = intCard(64, 'bytes B0–B7');
 $('foot').textContent = `Host byte order: ${LITTLE ? 'little' : 'big'}-endian. TypedArray views use native order, so B0 (the lowest address) holds the ${LITTLE ? 'least' : 'most'} significant byte of each number. Big-endian is also network byte order.`;
@@ -1445,6 +1501,7 @@ buildGrid();
 buildColor();
 bindAll();
 bindColor();
+bindSmallFloats();
 setupControls();
 u64[0] = 0x0123456789ABCDEFn;
 update();

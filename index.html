@@ -2254,9 +2254,10 @@ function renderRv(d, src) {
       case 'rf3': return `${v}${r.name ? ` → <b>${r.name}</b>` : ''}`;
       case 'rf7': return r.fmt === 'SYS' ? `${v} → <b>${r.name}</b>` : `${v}${r.name === 'sub' || r.name === 'sra' || r.name === 'srai' ? ' (bit 30 set: the subtract / arithmetic variant)' : r.f7 === 1 ? ' (multiply/divide extension)' : ''}`;
       case 'rimm': {
-        if (r.fmt === 'I' || r.fmt === 'L' || r.fmt === 'JR') return `<b>${r.imm}</b> (sign-extended)`;
+        if (r.fmt === 'I' || r.fmt === 'L' || r.fmt === 'JR' || r.fmt === 'F') return `<b>${r.imm}</b> (sign-extended)`;
         if (r.fmt === 'IS') return `shift by <b>${v}</b>`;
         if (r.fmt === 'U') return `<b>0x${v.toString(16)}</b>`;
+        if (r.fmt === 'C') return 'the compressed instruction’s fields — not decoded here';
         // S/B/J: say which immediate bits this piece carries
         const map = RV_PIECES[r.fmt].find(p => p.hi === f.hi);
         return map.parts.map(([h, l, dst]) => `<span class="c-rimm">${bin(rvBits(x, h, l), h - l + 1)}</span> → imm[${dst}]`).join(' · ');

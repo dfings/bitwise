@@ -145,6 +145,7 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .r-frac { --c: var(--mant); }
 .r-pt { --c: var(--prefix); } .r-ps { --c: var(--sign); } .r-pu { --c: var(--exp); } .r-pg { --c: var(--mant); } .r-po { --c: var(--int); }
 .r-ts { --c: var(--exp); } .r-mid { --c: var(--prefix); } .r-seq { --c: var(--mant); }
+.r-fy { --c: var(--exp); } .r-fm { --c: var(--mant); } .r-fd { --c: var(--int); } .r-fh { --c: var(--prefix); } .r-fn { --c: var(--pay); } .r-fs { --c: var(--sign); }
 
 /* hover-to-isolate a field's bits */
 .bytes[data-hl] .bit { opacity: .18; }
@@ -155,7 +156,8 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .bytes[data-hl="oui"] .r-oui, .bytes[data-hl="nic"] .r-nic, .bytes[data-hl="flag"] .r-flag,
 .bytes[data-hl="one"] .r-one, .bytes[data-hl="lz"] .r-lz, .bytes[data-hl="tz"] .r-tz, .bytes[data-hl="frac"] .r-frac,
 .bytes[data-hl="pt"] .r-pt, .bytes[data-hl="ps"] .r-ps, .bytes[data-hl="pu"] .r-pu, .bytes[data-hl="pg"] .r-pg, .bytes[data-hl="po"] .r-po,
-.bytes[data-hl="ts"] .r-ts, .bytes[data-hl="mid"] .r-mid, .bytes[data-hl="seq"] .r-seq { opacity: 1; }
+.bytes[data-hl="ts"] .r-ts, .bytes[data-hl="mid"] .r-mid, .bytes[data-hl="seq"] .r-seq,
+.bytes[data-hl="fy"] .r-fy, .bytes[data-hl="fm"] .r-fm, .bytes[data-hl="fd"] .r-fd, .bytes[data-hl="fh"] .r-fh, .bytes[data-hl="fn"] .r-fn, .bytes[data-hl="fs"] .r-fs { opacity: 1; }
 
 .stream-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .hexrow { display: flex; align-items: center; gap: 8px; flex: 1 1 300px; min-width: 0; }
@@ -256,6 +258,7 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--alpha); }
 
 /* bit fields deck */
 .c-ts { color: var(--exp); } .c-mid { color: var(--prefix); } .c-seq { color: var(--mant); }
+.c-fy { color: var(--exp); } .c-fm { color: var(--mant); } .c-fd { color: var(--int); } .c-fh { color: var(--prefix); } .c-fn { color: var(--pay); } .c-fs { color: var(--sign); }
 .fieldbar { display: flex; height: 26px; border-radius: 7px; overflow: hidden; margin: 2px 0 12px; font: 600 11px/26px var(--mono); }
 .fieldbar > div { text-align: center; color: #0a0d13; white-space: nowrap; overflow: hidden; cursor: default; }
 .c-pt { color: var(--prefix); } .c-ps { color: var(--sign); } .c-pu { color: var(--exp); } .c-pg { color: var(--mant); } .c-po { color: var(--int); }
@@ -585,6 +588,14 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
           </div>
           <p class="hint">Each octal digit is exactly three bits — r = 4, w = 2, x = 1 — which is why permissions are written in octal: 7 = rwx, 5 = r-x, 4 = r--. The leading digit holds the special bits: setuid (4, run as the file’s owner, e.g. <code>passwd</code>), setgid (2) and sticky (1, on <code>/tmp</code>: only a file’s owner may delete it).</p>
         </article>
+        <article class="card" data-lens="fat">
+          <div class="card-h"><h3>FAT / ZIP timestamp</h3><span class="tag">32-bit DOS date + time · bytes B0–B3</span><span class="badge" id="fat-badge"></span></div>
+          <div class="fieldbar" id="fat-bar"></div>
+          <div class="when"><div class="big" id="fat-when"></div><div class="pval" id="fat-desc"></div></div>
+          <label class="field"><span class="lab">Date and time (YYYY-MM-DD HH:MM:SS, or “now”)</span><input type="text" id="fat-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label>
+          <div class="parts" id="fat-parts"></div>
+          <p class="hint">MS-DOS packed a whole date and time into 32 bits by giving each part just enough bits: 7 for the year (counted from 1980), 4 for the month, 5 for the day and hour, 6 for the minute — and only 5 for the seconds, so it stores seconds ÷ 2. FAT file systems and every ZIP file still use it. There is no time zone, timestamps have 2-second resolution, and the year field runs out after 2107.</p>
+        </article>
         <article class="card" data-lens="snow">
           <div class="card-h"><h3>Snowflake ID</h3><span class="tag">64-bit · bytes B0–B7 · Twitter / X, Discord</span><span class="badge" id="snow-badge"></span></div>
           <div class="fieldbar">
@@ -675,8 +686,8 @@ const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
 const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
-const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields' };
-Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields' });
+const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields' };
+Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields' });
 Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
 // display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
 const displayOrder = () => (state.order === 'le') === LITTLE ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -838,6 +849,7 @@ const ROLE_NAMES = {
   cr: 'red', cg: 'green', cb: 'blue', ca: 'alpha', oui: 'OUI (vendor)', nic: 'device-specific', flag: 'MAC flag bit',
   one: 'set bit', lz: 'leading zero', tz: 'trailing zero', frac: 'fraction bit',
   ts: 'timestamp', mid: 'machine ID', seq: 'sequence',
+  fy: 'year − 1980', fm: 'month', fd: 'day', fh: 'hour', fn: 'minute', fs: 'seconds ÷ 2',
   pt: 'file type', ps: 'special bit', pu: 'owner permission', pg: 'group permission', po: 'others permission',
 };
 const LEGENDS = {
@@ -860,6 +872,7 @@ const LEGENDS = {
   b32: [['one', 'Set bits (1s)'], ['lz', 'Leading zeros'], ['tz', 'Trailing zeros'], ['unused', 'Other zeros · outside (B4–B7)']],
   q16: [['sign', 'Sign'], ['int', 'Integer part (15)'], ['frac', 'Fraction (16)'], ['unused', 'Outside (B4–B7)']],
   q15: [['sign', 'Sign'], ['frac', 'Fraction (15)'], ['unused', 'Outside (B2–B7)']],
+  fat: [['fy', 'Year − 1980 (7)'], ['fm', 'Month (4)'], ['fd', 'Day (5)'], ['fh', 'Hour (5)'], ['fn', 'Minute (6)'], ['fs', 'Seconds ÷ 2 (5)'], ['unused', 'Outside (B4–B7)']],
   snow: [['sign', 'Sign (always 0)'], ['ts', 'Timestamp (41)'], ['mid', 'Machine (10)'], ['seq', 'Sequence (12)']],
   perm: [['pt', 'File type (4)'], ['ps', 'setuid · setgid · sticky'], ['pu', 'Owner rwx'], ['pg', 'Group rwx'], ['po', 'Others rwx'], ['unused', 'Outside (B2–B7)']],
 };
@@ -883,6 +896,11 @@ function roleOf(b, k, d) {
     case 't64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
     case 'ip4': return b < 4 ? 'int' : 'unused';
     case 'mac': return b >= 6 ? 'unused' : b >= 3 ? 'nic' : b === 0 && k < 2 ? 'flag' : 'oui';
+    case 'fat': {
+      if (b >= 4) return 'unused';
+      const v = valueBit(b, k, 4);
+      return FAT_FIELDS.find(f => v >= f.lo).role;
+    }
     case 'snow': { const v = valueBit(b, k, 8); return v === 63 ? 'sign' : v >= 22 ? 'ts' : v >= 12 ? 'mid' : 'seq'; }
     case 'perm': {
       if (b >= 2) return 'unused';
@@ -929,6 +947,7 @@ function byteNote(b, d) {
     case 'q15': return b < 2 ? range(2) : '—';
     case 'perm': return b < 2 ? range(2) : '—';
     case 'snow': return range(8);
+    case 'fat': return b < 4 ? (valueBit(b, 0, 4) >= 16 ? 'date' : 'time') : '—';
     case 'b32': return b < 4 ? range(4) : '—';
   }
 }
@@ -1317,6 +1336,7 @@ function update(src = null) {
   renderFixed('q15', src);
   renderPerm(src);
   renderSnow(src);
+  renderFat(src);
   renderLens();
 }
 
@@ -1999,6 +2019,59 @@ function bindSnow() {
   }));
 }
 
+/* ═══════════ FAT / ZIP timestamp ═══════════ */
+// value bits of the u32, highest field first; date is the top half, time the bottom half
+const FAT_FIELDS = [
+  { role: 'fy', name: 'Year', lo: 25, n: 7 }, { role: 'fm', name: 'Month', lo: 21, n: 4 }, { role: 'fd', name: 'Day', lo: 16, n: 5 },
+  { role: 'fh', name: 'Hour', lo: 11, n: 5 }, { role: 'fn', name: 'Minute', lo: 5, n: 6 }, { role: 'fs', name: 'Seconds ÷ 2', lo: 0, n: 5 },
+];
+const packFat = (y, mo, d, h, mi, s) => (((y - 1980) << 25) | (mo << 21) | (d << 16) | (h << 11) | (mi << 5) | (s >> 1)) >>> 0;
+
+function renderFat(src) {
+  const v = u32[0], f = {};
+  for (const x of FAT_FIELDS) f[x.role] = (v >>> x.lo) & ((1 << x.n) - 1);
+  const year = 1980 + f.fy, sec = f.fs * 2;
+  const dim = new Date(Date.UTC(year, f.fm, 0)).getUTCDate(); // days in that month
+  const problems = [
+    (f.fm < 1 || f.fm > 12) && `month ${f.fm}`,
+    (f.fd < 1 || (f.fm >= 1 && f.fm <= 12 && f.fd > dim)) && `day ${f.fd}`,
+    f.fh > 23 && `hour ${f.fh}`, f.fn > 59 && `minute ${f.fn}`, f.fs > 29 && `seconds ${sec}`,
+  ].filter(Boolean);
+  const p2 = n => String(n).padStart(2, '0');
+  const text = `${year}-${p2(f.fm)}-${p2(f.fd)} ${p2(f.fh)}:${p2(f.fn)}:${p2(sec)}`;
+  $('fat-bar').innerHTML = FAT_FIELDS.map(x => `<div style="width:calc(${x.n} / 32 * 100%);background:var(${{ fy: '--exp', fm: '--mant', fd: '--int', fh: '--prefix', fn: '--pay', fs: '--sign' }[x.role]})" data-hl="${x.role}" title="${x.name}: ${x.n} bits">${x.n}</div>`).join('');
+  $('fat-when').innerHTML = FAT_FIELDS.map((x, i) => {
+    const val = x.role === 'fy' ? year : x.role === 'fs' ? p2(sec) : p2(f[x.role]);
+    return `<span class="c-${x.role}" data-hl="${x.role}">${val}</span>${['-', '-', ' ', ':', ':', ''][i]}`;
+  }).join('');
+  const badge = $('fat-badge');
+  badge.className = 'badge ' + (problems.length ? 'k-bad' : 'k-ok');
+  badge.textContent = problems.length ? 'invalid date' : 'valid';
+  $('fat-desc').textContent = problems.length
+    ? `Not a real date/time: ${problems.join(', ')}.`
+    : `${new Date(year, f.fm - 1, f.fd).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} — local wall-clock time, no time zone stored`;
+  setVal($('fat-in'), text, src);
+  $('fat-parts').innerHTML = FAT_FIELDS.map(x => {
+    const raw = f[x.role];
+    const meaning = x.role === 'fy' ? `${raw} + 1980 = <b>${year}</b>` : x.role === 'fs' ? `${raw} × 2 = <b>${sec}</b> seconds` : `<b>${raw}</b>`;
+    return `<div class="part" data-hl="${x.role}"><div class="part-h"><span><i class="sw r-${x.role}"></i>${x.name}</span><em>${x.n} bits · ${x.lo + x.n - 1}–${x.lo}</em></div><code class="pbits c-${x.role}">${bin(raw, x.n)}</code><div class="pval">${meaning}</div></div>`;
+  }).join('');
+}
+
+function bindFat() {
+  bind('fat-in', s => {
+    const t = s.trim();
+    if (!t) return null;
+    if (t.toLowerCase() === 'now') { const d = new Date(); return [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()]; }
+    const m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+    if (!m) throw new Error('Expected YYYY-MM-DD HH:MM:SS');
+    const [y, mo, d, h = 0, mi = 0, sc = 0] = m.slice(1).map(x => x === undefined ? undefined : Number(x));
+    if (y < 1980 || y > 2107) throw new Error('DOS dates cover 1980–2107');
+    if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59 || sc > 59) throw new Error('Out-of-range month, day or time');
+    return [y, mo, d, h, mi, sc];
+  }, parts => { u32[0] = packFat(...parts); });
+}
+
 /* ═══════════ Toolbar, presets, lens interaction ═══════════ */
 const OPS = {
   zero: () => u8.fill(0),
@@ -2110,6 +2183,12 @@ const PRESETS = [
     ['drwxrwxrwt 1777 (/tmp, sticky)', () => { u8.fill(0); u16[0] = 0o041777; }, 'perm'],
     ['-rwsr-xr-x 4755 (passwd, setuid)', () => { u8.fill(0); u16[0] = 0o104755; }, 'perm'],
     ['lrwxrwxrwx 777 (symlink)', () => { u8.fill(0); u16[0] = 0o120777; }, 'perm'],
+  ]],
+  ['FAT / ZIP time', [
+    ['DOS epoch 1980-01-01 00:00:00', () => { u8.fill(0); u32[0] = packFat(1980, 1, 1, 0, 0, 0); }, 'fat'],
+    ['Now (local time)', () => { u8.fill(0); const d = new Date(); u32[0] = packFat(d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()); }, 'fat'],
+    ['Last DOS time 2107-12-31 23:59:58', () => { u8.fill(0); u32[0] = packFat(2107, 12, 31, 23, 59, 58); }, 'fat'],
+    ['All zeros (month 0 — invalid)', () => { u8.fill(0); }, 'fat'],
   ]],
   ['snowflake', [
     ['Discord docs example 175928847299117063', () => { u64[0] = 175928847299117063n; }, 'snow'],
@@ -2249,6 +2328,7 @@ bindFixed();
 buildPerm();
 bindPerm();
 bindSnow();
+bindFat();
 setupControls();
 u64[0] = 0x0123456789ABCDEFn;
 update();

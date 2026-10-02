@@ -473,6 +473,17 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
           <div class="cols8" id="utf8-cells"></div>
           <div class="kv" style="margin-top:12px"><span>TextDecoder</span><code id="utf8-js"></code></div>
         </article>
+        <article class="card" data-lens="u16">
+          <div class="card-h"><h3>UTF-16</h3><span class="tag">4 code units · little-endian, as Windows, Java and JavaScript store strings</span><span class="badge" id="u16-badge"></span></div>
+          <div class="fields"><label class="field"><span class="lab">UTF-16 string (escapes: \uD83D \n \0 \\)</span><input type="text" id="u16-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label></div>
+          <div class="cols8" id="u16-cells"></div>
+          <div class="kv" style="margin-top:12px">
+            <span>JS length</span><code id="u16-len"></code>
+            <span>Surrogates</span><code id="u16-math"></code>
+            <span>As UTF-16BE</span><code id="u16-be"></code>
+          </div>
+          <p class="hint">UTF-16 stores most characters in one 16-bit code unit. Characters beyond U+FFFF — most emoji — need two: a <b>surrogate pair</b>, a high surrogate (110110…) followed by a low surrogate (110111…) that together carry 20 bits. JavaScript strings are UTF-16, which is why <code>"😀".length === 2</code>. A surrogate without its partner is invalid.</p>
+        </article>
       </div>
     </section>
 
@@ -701,8 +712,8 @@ const u16 = new Uint16Array(buffer);
 const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
-const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
-const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields', rv: 'fields' };
+const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', u16: 'text', c32: 'color', c64: 'color', c565: 'color' };
+const TAB_OF = { u16: 'text', c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields', rv: 'fields' };
 Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields', rv: 'fields' });
 Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
 // display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
@@ -877,6 +888,7 @@ const LEGENDS = {
   i32: [['sign', 'Sign bit (2³¹ weight)'], ['int', 'Value bits'], ['unused', 'Outside i32 (B4–B7)']],
   i64: [['sign', 'Sign bit (2⁶³ weight)'], ['int', 'Value bits']],
   text: [['prefix', 'UTF-8 marker bits (0 / 110 / 1110 / 11110 / 10)'], ['txt', 'Code-point payload'], ['bad', 'Invalid byte']],
+  u16: [['prefix', 'Surrogate marker (110110 / 110111)'], ['txt', 'Code-point bits'], ['bad', 'Unpaired surrogate']],
   varint: [['cont', 'Continuation (MSB)'], ['pay', '7-bit payload'], ['unused', 'Not in stream']],
   c32: [['cr', 'Red'], ['cg', 'Green'], ['cb', 'Blue'], ['ca', 'Alpha'], ['', '8 bits each · 2 pixels']],
   c64: [['cr', 'Red'], ['cg', 'Green'], ['cb', 'Blue'], ['ca', 'Alpha'], ['', '16 bits each · 1 pixel']],
@@ -904,6 +916,11 @@ function roleOf(b, k, d) {
     case 'f16': case 'bf16': { if (b >= 2) return 'unused'; const v = valueBit(b, k, 2), M = state.lens === 'f16' ? 10 : 7; return v === 15 ? 'sign' : v >= M ? 'exp' : 'mant'; }
     case 'i32': { if (b >= 4) return 'unused'; return valueBit(b, k, 4) === 31 ? 'sign' : 'int'; }
     case 'i64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
+    case 'u16': {
+      const kind = d.utf16.kinds[b >> 1], idx = (b & 1) * 8 + k; // bit within the little-endian code unit
+      if (kind === 'bad') return 'bad';
+      return kind === 'pair' && idx >= 10 ? 'prefix' : 'txt';
+    }
     case 'text': { const inf = d.utf8.info[b]; if (inf.kind === 'invalid') return 'bad'; return k >= 8 - inf.prefix ? 'prefix' : 'txt'; }
     case 'varint': if (b >= d.varint.len) return 'unused'; return k === 7 ? 'cont' : 'pay';
     case 'c32': { const w = b >> 2; return CH_ROLE[state.colorLayout[3 - (valueBit(b - 4 * w, k, 4) >> 3)]]; }
@@ -951,6 +968,7 @@ function byteNote(b, d) {
     case 'f32': case 'i32': return b < 4 ? range(4) : '—';
     case 'f64': case 'i64': return range(8);
     case 'f16': case 'bf16': return b < 2 ? range(2) : '—';
+    case 'u16': return `unit ${b >> 1} ${b & 1 ? 'hi' : 'lo'}`;
     case 'text': {
       const x = u8[b], k = d.utf8.info[b].kind;
       if (k === 'ascii') return x > 0x20 && x < 0x7f ? `'${String.fromCharCode(x)}'` : (CTRL[x] || 'DEL');
@@ -1339,7 +1357,7 @@ function renderHexAll(src) {
   $('hexLab').textContent = state.order === 'be' ? 'Bytes (hex, MSB first)' : 'Bytes (hex, LSB first)';
 }
 
-function derive() { return { utf8: decodeUtf8(u8), varint: decodeVarint(u8), b64: bitInfo(u64[0], 64), b32: bitInfo(BigInt(u32[0]), 32), rv: rvDecode(rvRead()) }; }
+function derive() { return { utf8: decodeUtf8(u8), varint: decodeVarint(u8), b64: bitInfo(u64[0], 64), b32: bitInfo(BigInt(u32[0]), 32), rv: rvDecode(rvRead()), utf16: decodeUtf16() }; }
 
 function update(src = null) {
   const d = derive();
@@ -1351,6 +1369,7 @@ function update(src = null) {
   renderInt(32, src);
   renderInt(64, src);
   renderText(d, src);
+  renderUtf16(d, src);
   renderVarint(d, src);
   renderColor(src);
   renderTime(src);
@@ -2350,6 +2369,89 @@ function bindRv() {
   bind('rv-in', rvAssemble, rvWrite);
 }
 
+/* ═══════════ UTF-16 ═══════════ */
+const u16le = i => u8[2 * i] | (u8[2 * i + 1] << 8); // code units are little-endian whatever the host
+const isHi = u => u >= 0xD800 && u <= 0xDBFF, isLo = u => u >= 0xDC00 && u <= 0xDFFF;
+function decodeUtf16() {
+  const units = [0, 1, 2, 3].map(u16le), kinds = [], segs = [];
+  for (let i = 0; i < 4;) {
+    const u = units[i];
+    if (isHi(u) && i + 1 < 4 && isLo(units[i + 1])) {
+      kinds[i] = kinds[i + 1] = 'pair';
+      segs.push({ start: i, len: 2, cp: 0x10000 + ((u - 0xD800) << 10) + (units[i + 1] - 0xDC00) });
+      i += 2;
+    } else if (isHi(u) || isLo(u)) {
+      kinds[i] = 'bad'; segs.push({ start: i, len: 1, cp: null }); i++;
+    } else {
+      kinds[i] = 'bmp'; segs.push({ start: i, len: 1, cp: u }); i++;
+    }
+  }
+  return { units, kinds, segs };
+}
+const hex4 = n => n.toString(16).toUpperCase().padStart(4, '0');
+function writeUtf16(str) { u8.fill(0); parseUtf16(str).forEach((u, i) => { u8[2 * i] = u & 255; u8[2 * i + 1] = u >> 8; }); }
+function parseUtf16(str) {
+  const out = [];
+  for (let i = 0; i < str.length;) {
+    if (str[i] === '\\') {
+      const n = str[i + 1];
+      if (n === 'u') {
+        const h = str.slice(i + 2, i + 6);
+        if (!/^[0-9a-f]{4}$/i.test(h)) throw new Error('\\u needs four hex digits');
+        out.push(parseInt(h, 16)); i += 6; continue;
+      }
+      const map = { n: 10, t: 9, r: 13, '0': 0, '\\': 92 };
+      if (n in map) { out.push(map[n]); i += 2; continue; }
+      throw new Error(n === undefined ? 'Dangling backslash' : `Unknown escape \\${n}`);
+    }
+    out.push(str.charCodeAt(i)); i++; // JS strings are already UTF-16 code units
+  }
+  if (out.length > 4) throw new Error(`${out.length} code units — the buffer holds 4`);
+  return out;
+}
+
+function renderUtf16(d, src) {
+  const { units, segs } = d.utf16;
+  let end = 4; while (end > 0 && units[end - 1] === 0) end--;
+  let str = '', js = '', cps = 0, bad = 0, math = '';
+  const cells = segs.map(sg => {
+    const bytes = `B${2 * sg.start}–B${2 * (sg.start + sg.len) - 1}`, range = `${2 * sg.start}-${2 * (sg.start + sg.len) - 1}`;
+    const used = sg.start < end;
+    if (sg.cp === null) {
+      bad++;
+      if (used) str += '\\u' + hex4(units[sg.start]);
+      return `<div class="cell bad" data-bytes="${range}" style="grid-column:span 2" title="${bytes}: unpaired surrogate"><span class="g">�</span><span class="h">${hex4(units[sg.start])}</span><span class="n">unpaired</span></div>`;
+    }
+    const c = cpGlyph(sg.cp), u = 'U+' + hex4(sg.cp);
+    if (used) {
+      cps++;
+      js += String.fromCodePoint(sg.cp);
+      str += sg.cp === 0x5c ? '\\\\' : sg.cp === 10 ? '\\n' : sg.cp === 9 ? '\\t' : sg.cp === 13 ? '\\r'
+        : c.ctrl && sg.cp !== 0x20 ? '\\u' + hex4(sg.cp) : String.fromCodePoint(sg.cp);
+    }
+    if (sg.len === 2) {
+      const [hi, lo] = [units[sg.start], units[sg.start + 1]];
+      if (!math) math = `0x10000 + (0x${hex4(hi)} − 0xD800) × 0x400 + (0x${hex4(lo)} − 0xDC00) = 0x${sg.cp.toString(16).toUpperCase()}`;
+      return `<div class="cell lead" data-bytes="${range}" style="grid-column:span 4" title="${u} · surrogate pair ${hex4(hi)} ${hex4(lo)}"><span class="g">${esc(c.g)}</span><span class="h">${u}</span><span class="n">pair · ${hex4(hi)} ${hex4(lo)}</span></div>`;
+    }
+    const note = sg.cp === 0xFEFF && sg.start === 0 ? 'BOM (LE)' : sg.cp === 0xFFFE && sg.start === 0 ? 'BOM — big-endian!' : c.n || hex4(units[sg.start]);
+    return `<div class="cell${c.ctrl ? ' ctrl' : ''}" data-bytes="${range}" style="grid-column:span 2" title="${u} · ${bytes}"><span class="g">${esc(sg.cp === 0xFEFF ? '␣' : c.g)}</span><span class="h">${u}</span><span class="n">${esc(note)}</span></div>`;
+  });
+  $('u16-cells').innerHTML = cells.join('');
+  setVal($('u16-in'), str, src);
+  const badge = $('u16-badge');
+  badge.className = 'badge ' + (bad ? 'k-bad' : 'k-ok');
+  badge.textContent = bad ? `${bad} unpaired surrogate${bad > 1 ? 's' : ''}` : 'valid UTF-16';
+  $('u16-len').textContent = `${end} code unit${end === 1 ? '' : 's'}${bad ? '' : ` · ${cps} character${cps === 1 ? '' : 's'}`} (trailing zeros ignored)`;
+  $('u16-math').textContent = math || 'none — every character fits in one code unit';
+  const be = [0, 1, 2, 3].map(i => (u8[2 * i] << 8) | u8[2 * i + 1]);
+  $('u16-be').textContent = JSON.stringify(String.fromCharCode(...be)).replace(/\\u0000/g, '\\0') + '  (same bytes, each pair swapped)';
+}
+
+function bindUtf16() {
+  bind('u16-in', parseUtf16, units => { u8.fill(0); units.forEach((u, i) => { u8[2 * i] = u & 255; u8[2 * i + 1] = u >> 8; }); });
+}
+
 /* ═══════════ Toolbar, presets, lens interaction ═══════════ */
 const OPS = {
   zero: () => u8.fill(0),
@@ -2417,6 +2519,11 @@ const PRESETS = [
     ['Q1.15 largest (≈ 0.99997)', () => { u8.fill(0); u16[0] = 0x7FFF; }, 'q15'],
   ]],
   ['text', [
+    ['UTF-16 "Hi!"', () => writeUtf16('Hi!'), 'u16'],
+    ['UTF-16 "😀" (surrogate pair)', () => writeUtf16('😀'), 'u16'],
+    ['UTF-16 "€😀" (one unit + a pair)', () => writeUtf16('€😀'), 'u16'],
+    ['UTF-16 unpaired surrogate', () => writeUtf16('\uD83DA'), 'u16'],
+    ['UTF-16 byte-order mark + "A"', () => writeUtf16('\uFEFFA'), 'u16'],
     ['ASCII "Hi!\\n"', () => writeBytes(utf8Bytes('Hi!\n'))],
     ['UTF-8 "€😀"', () => writeBytes(utf8Bytes('€😀'))],
     ['UTF-8 "héllo"', () => writeBytes(utf8Bytes('héllo'))],
@@ -2609,6 +2716,7 @@ $('foot').textContent = `Host byte order: ${LITTLE ? 'little' : 'big'}-endian. T
 buildGrid();
 buildColor();
 bindAll();
+bindUtf16();
 bindColor();
 bindSmallFloats();
 bindTime();

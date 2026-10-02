@@ -145,6 +145,7 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .r-frac { --c: var(--mant); }
 .r-pt { --c: var(--prefix); } .r-ps { --c: var(--sign); } .r-pu { --c: var(--exp); } .r-pg { --c: var(--mant); } .r-po { --c: var(--int); }
 .r-ts { --c: var(--exp); } .r-mid { --c: var(--prefix); } .r-seq { --c: var(--mant); }
+.r-rop { --c: var(--prefix); } .r-rrd { --c: var(--exp); } .r-rf3 { --c: var(--sign); } .r-rs1 { --c: var(--mant); } .r-rs2 { --c: var(--pay); } .r-rf7 { --c: var(--int); } .r-rimm { --c: var(--txt); }
 .r-fy { --c: var(--exp); } .r-fm { --c: var(--mant); } .r-fd { --c: var(--int); } .r-fh { --c: var(--prefix); } .r-fn { --c: var(--pay); } .r-fs { --c: var(--sign); }
 
 /* hover-to-isolate a field's bits */
@@ -157,6 +158,7 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .bytes[data-hl="one"] .r-one, .bytes[data-hl="lz"] .r-lz, .bytes[data-hl="tz"] .r-tz, .bytes[data-hl="frac"] .r-frac,
 .bytes[data-hl="pt"] .r-pt, .bytes[data-hl="ps"] .r-ps, .bytes[data-hl="pu"] .r-pu, .bytes[data-hl="pg"] .r-pg, .bytes[data-hl="po"] .r-po,
 .bytes[data-hl="ts"] .r-ts, .bytes[data-hl="mid"] .r-mid, .bytes[data-hl="seq"] .r-seq,
+.bytes[data-hl="rop"] .r-rop, .bytes[data-hl="rrd"] .r-rrd, .bytes[data-hl="rf3"] .r-rf3, .bytes[data-hl="rs1"] .r-rs1, .bytes[data-hl="rs2"] .r-rs2, .bytes[data-hl="rf7"] .r-rf7, .bytes[data-hl="rimm"] .r-rimm,
 .bytes[data-hl="fy"] .r-fy, .bytes[data-hl="fm"] .r-fm, .bytes[data-hl="fd"] .r-fd, .bytes[data-hl="fh"] .r-fh, .bytes[data-hl="fn"] .r-fn, .bytes[data-hl="fs"] .r-fs { opacity: 1; }
 
 .stream-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -258,6 +260,8 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--alpha); }
 
 /* bit fields deck */
 .c-ts { color: var(--exp); } .c-mid { color: var(--prefix); } .c-seq { color: var(--mant); }
+.c-rop { color: var(--prefix); } .c-rrd { color: var(--exp); } .c-rf3 { color: var(--sign); } .c-rs1 { color: var(--mant); } .c-rs2 { color: var(--pay); } .c-rf7 { color: var(--int); } .c-rimm { color: var(--txt); }
+.rvasm { font: 600 22px/1.3 var(--mono); overflow-wrap: anywhere; }
 .c-fy { color: var(--exp); } .c-fm { color: var(--mant); } .c-fd { color: var(--int); } .c-fh { color: var(--prefix); } .c-fn { color: var(--pay); } .c-fs { color: var(--sign); }
 .fieldbar { display: flex; height: 26px; border-radius: 7px; overflow: hidden; margin: 2px 0 12px; font: 600 11px/26px var(--mono); }
 .fieldbar > div { text-align: center; color: #0a0d13; white-space: nowrap; overflow: hidden; cursor: default; }
@@ -596,6 +600,18 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
           <div class="parts" id="fat-parts"></div>
           <p class="hint">MS-DOS packed a whole date and time into 32 bits by giving each part just enough bits: 7 for the year (counted from 1980), 4 for the month, 5 for the day and hour, 6 for the minute — and only 5 for the seconds, so it stores seconds ÷ 2. FAT file systems and every ZIP file still use it. There is no time zone, timestamps have 2-second resolution, and the year field runs out after 2107.</p>
         </article>
+        <article class="card" data-lens="rv">
+          <div class="card-h"><h3>RISC-V instruction</h3><span class="tag">RV32IM · 32 bits · bytes B0–B3, little-endian</span><span class="badge" id="rv-badge"></span></div>
+          <div class="fieldbar" id="rv-bar"></div>
+          <div class="when"><div class="rvasm" id="rv-asm"></div><div class="pval" id="rv-alt"></div><div class="pval" id="rv-mean"></div></div>
+          <label class="field"><span class="lab">Assembly (e.g. addi a0, zero, 42 · lw a0, 8(sp) · beq a0, a1, -8 · li / mv / j / ret)</span><input type="text" id="rv-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label>
+          <div class="parts" id="rv-parts"></div>
+          <div class="kv">
+            <span>Machine code</span><code id="rv-hex"></code>
+            <span>In memory</span><code id="rv-mem"></code>
+          </div>
+          <p class="hint">The opcode in the low 7 bits picks the format (R, I, S, B, U or J), and the format decides where every other field sits. Register fields stay in the same place in every format and the immediate’s sign is always bit 31, so hardware can start reading registers before it knows the instruction — that is why the S, B and J immediates look scrambled.</p>
+        </article>
         <article class="card" data-lens="snow">
           <div class="card-h"><h3>Snowflake ID</h3><span class="tag">64-bit · bytes B0–B7 · Twitter / X, Discord</span><span class="badge" id="snow-badge"></span></div>
           <div class="fieldbar">
@@ -686,8 +702,8 @@ const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
 const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
-const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields' };
-Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields' });
+const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields', rv: 'fields' };
+Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields', snow: 'fields', fat: 'fields', rv: 'fields' });
 Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
 // display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
 const displayOrder = () => (state.order === 'le') === LITTLE ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -849,6 +865,7 @@ const ROLE_NAMES = {
   cr: 'red', cg: 'green', cb: 'blue', ca: 'alpha', oui: 'OUI (vendor)', nic: 'device-specific', flag: 'MAC flag bit',
   one: 'set bit', lz: 'leading zero', tz: 'trailing zero', frac: 'fraction bit',
   ts: 'timestamp', mid: 'machine ID', seq: 'sequence',
+  rop: 'opcode', rrd: 'rd (destination register)', rf3: 'funct3', rs1: 'rs1 (source register 1)', rs2: 'rs2 (source register 2)', rf7: 'funct7', rimm: 'immediate',
   fy: 'year − 1980', fm: 'month', fd: 'day', fh: 'hour', fn: 'minute', fs: 'seconds ÷ 2',
   pt: 'file type', ps: 'special bit', pu: 'owner permission', pg: 'group permission', po: 'others permission',
 };
@@ -896,6 +913,11 @@ function roleOf(b, k, d) {
     case 't64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
     case 'ip4': return b < 4 ? 'int' : 'unused';
     case 'mac': return b >= 6 ? 'unused' : b >= 3 ? 'nic' : b === 0 && k < 2 ? 'flag' : 'oui';
+    case 'rv': {
+      if (b >= 4) return 'unused';
+      const v = b * 8 + k; // instructions are always little-endian
+      return d.rv.layout.find(f => v <= f.hi && v >= f.lo).role;
+    }
     case 'fat': {
       if (b >= 4) return 'unused';
       const v = valueBit(b, k, 4);
@@ -947,6 +969,7 @@ function byteNote(b, d) {
     case 'q15': return b < 2 ? range(2) : '—';
     case 'perm': return b < 2 ? range(2) : '—';
     case 'snow': return range(8);
+    case 'rv': return b < 4 ? `[${b * 8 + 7}:${b * 8}]` : '—';
     case 'fat': return b < 4 ? (valueBit(b, 0, 4) >= 16 ? 'date' : 'time') : '—';
     case 'b32': return b < 4 ? range(4) : '—';
   }
@@ -1036,6 +1059,7 @@ function renderGrid(d) {
 }
 
 function renderLegend() {
+  if (state.lens === 'rv') LEGENDS.rv = rvLegend(rvDecode(rvRead()));
   $('legend').innerHTML = LEGENDS[state.lens]
     .map(([r, l]) => r ? `<span class="chip"><i class="sw r-${r}"></i>${l}</span>` : `<span class="chip">${l}</span>`).join('');
 }
@@ -1315,7 +1339,7 @@ function renderHexAll(src) {
   $('hexLab').textContent = state.order === 'be' ? 'Bytes (hex, MSB first)' : 'Bytes (hex, LSB first)';
 }
 
-function derive() { return { utf8: decodeUtf8(u8), varint: decodeVarint(u8), b64: bitInfo(u64[0], 64), b32: bitInfo(BigInt(u32[0]), 32) }; }
+function derive() { return { utf8: decodeUtf8(u8), varint: decodeVarint(u8), b64: bitInfo(u64[0], 64), b32: bitInfo(BigInt(u32[0]), 32), rv: rvDecode(rvRead()) }; }
 
 function update(src = null) {
   const d = derive();
@@ -1337,6 +1361,7 @@ function update(src = null) {
   renderPerm(src);
   renderSnow(src);
   renderFat(src);
+  renderRv(d, src);
   renderLens();
 }
 
@@ -2072,6 +2097,258 @@ function bindFat() {
   }, parts => { u32[0] = packFat(...parts); });
 }
 
+/* ═══════════ RISC-V instruction (RV32IM) ═══════════ */
+const RV_REGS = ['zero', 'ra', 'sp', 'gp', 'tp', 't0', 't1', 't2', 's0', 's1', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7',
+  's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 't3', 't4', 't5', 't6'];
+// name → [format, opcode, funct3, funct7 (or imm12 for SYS)]
+const RV_INS = {
+  lui: ['U', 0x37], auipc: ['U', 0x17], jal: ['J', 0x6f], jalr: ['JR', 0x67, 0],
+  beq: ['B', 0x63, 0], bne: ['B', 0x63, 1], blt: ['B', 0x63, 4], bge: ['B', 0x63, 5], bltu: ['B', 0x63, 6], bgeu: ['B', 0x63, 7],
+  lb: ['L', 0x03, 0], lh: ['L', 0x03, 1], lw: ['L', 0x03, 2], lbu: ['L', 0x03, 4], lhu: ['L', 0x03, 5],
+  sb: ['S', 0x23, 0], sh: ['S', 0x23, 1], sw: ['S', 0x23, 2],
+  addi: ['I', 0x13, 0], slti: ['I', 0x13, 2], sltiu: ['I', 0x13, 3], xori: ['I', 0x13, 4], ori: ['I', 0x13, 6], andi: ['I', 0x13, 7],
+  slli: ['IS', 0x13, 1, 0x00], srli: ['IS', 0x13, 5, 0x00], srai: ['IS', 0x13, 5, 0x20],
+  add: ['R', 0x33, 0, 0x00], sub: ['R', 0x33, 0, 0x20], sll: ['R', 0x33, 1, 0], slt: ['R', 0x33, 2, 0], sltu: ['R', 0x33, 3, 0],
+  xor: ['R', 0x33, 4, 0], srl: ['R', 0x33, 5, 0], sra: ['R', 0x33, 5, 0x20], or: ['R', 0x33, 6, 0], and: ['R', 0x33, 7, 0],
+  mul: ['R', 0x33, 0, 1], mulh: ['R', 0x33, 1, 1], mulhsu: ['R', 0x33, 2, 1], mulhu: ['R', 0x33, 3, 1],
+  div: ['R', 0x33, 4, 1], divu: ['R', 0x33, 5, 1], rem: ['R', 0x33, 6, 1], remu: ['R', 0x33, 7, 1],
+  ecall: ['SYS', 0x73, 0, 0], ebreak: ['SYS', 0x73, 0, 1], fence: ['F', 0x0f, 0],
+};
+const RV_OPCODES = { 0x37: 'LUI — load upper immediate', 0x17: 'AUIPC — add upper immediate to pc', 0x6f: 'JAL — jump and link', 0x67: 'JALR — jump and link register',
+  0x63: 'BRANCH — conditional branch', 0x03: 'LOAD — read memory', 0x23: 'STORE — write memory', 0x13: 'OP-IMM — arithmetic with an immediate',
+  0x33: 'OP — register–register arithmetic', 0x73: 'SYSTEM', 0x0f: 'MISC-MEM — fence' };
+const seg = (role, hi, lo, label) => ({ role, hi, lo, label });
+const RV_OPC = seg('rop', 6, 0, 'opcode'), RV_RD = seg('rrd', 11, 7, 'rd'), RV_F3 = seg('rf3', 14, 12, 'funct3'),
+  RV_RS1 = seg('rs1', 19, 15, 'rs1'), RV_RS2 = seg('rs2', 24, 20, 'rs2'), RV_F7 = seg('rf7', 31, 25, 'funct7');
+const RV_LAYOUT = {
+  R: [RV_F7, RV_RS2, RV_RS1, RV_F3, RV_RD, RV_OPC],
+  I: [seg('rimm', 31, 20, 'imm[11:0]'), RV_RS1, RV_F3, RV_RD, RV_OPC],
+  IS: [RV_F7, seg('rimm', 24, 20, 'shamt'), RV_RS1, RV_F3, RV_RD, RV_OPC],
+  SYS: [seg('rf7', 31, 20, 'funct12'), RV_RS1, RV_F3, RV_RD, RV_OPC],
+  S: [seg('rimm', 31, 25, 'imm[11:5]'), RV_RS2, RV_RS1, RV_F3, seg('rimm', 11, 7, 'imm[4:0]'), RV_OPC],
+  B: [seg('rimm', 31, 25, 'imm[12|10:5]'), RV_RS2, RV_RS1, RV_F3, seg('rimm', 11, 7, 'imm[4:1|11]'), RV_OPC],
+  U: [seg('rimm', 31, 12, 'imm[31:12]'), RV_RD, RV_OPC],
+  J: [seg('rimm', 31, 12, 'imm[20|10:1|11|19:12]'), RV_RD, RV_OPC],
+  X: [seg('unused', 31, 7, 'unknown'), RV_OPC],
+  C: [seg('unused', 31, 16, 'next 16 bits'), seg('rimm', 15, 2, 'compressed body'), seg('rop', 1, 0, 'op')],
+};
+// for S/B/J: which immediate bits each scattered field carries, as [instruction hi, lo, immediate bits]
+const RV_PIECES = {
+  S: [{ hi: 31, parts: [[31, 25, '11:5']] }, { hi: 11, parts: [[11, 7, '4:0']] }],
+  B: [{ hi: 31, parts: [[31, 31, '12'], [30, 25, '10:5']] }, { hi: 11, parts: [[11, 8, '4:1'], [7, 7, '11']] }],
+  J: [{ hi: 31, parts: [[31, 31, '20'], [30, 21, '10:1'], [20, 20, '11'], [19, 12, '19:12']] }],
+};
+const RV_TYPE = { R: 'R', I: 'I', IS: 'I', L: 'I', JR: 'I', F: 'I', SYS: 'I', S: 'S', B: 'B', U: 'U', J: 'J' };
+const rvRead = () => (u8[0] | (u8[1] << 8) | (u8[2] << 16) | (u8[3] << 24)) >>> 0;
+const rvWrite = x => { for (let i = 0; i < 4; i++) u8[i] = (x >>> (8 * i)) & 255; };
+const rvBits = (x, hi, lo) => (x >>> lo) & ((2 ** (hi - lo + 1)) - 1);
+
+function rvImm(fmt, x) {
+  const s = x | 0;
+  switch (fmt) {
+    case 'I': case 'L': case 'JR': case 'F': return s >> 20;
+    case 'IS': return rvBits(x, 24, 20);
+    case 'S': return ((s >> 25) << 5) | rvBits(x, 11, 7);
+    case 'B': return ((s >> 31) << 12) | (rvBits(x, 7, 7) << 11) | (rvBits(x, 30, 25) << 5) | (rvBits(x, 11, 8) << 1);
+    case 'U': return x >>> 12;
+    case 'J': return ((s >> 31) << 20) | (rvBits(x, 19, 12) << 12) | (rvBits(x, 20, 20) << 11) | (rvBits(x, 30, 21) << 1);
+  }
+  return 0;
+}
+function rvDecode(x) {
+  if ((x & 3) !== 3) return { fmt: 'C', layout: RV_LAYOUT.C };
+  const op = x & 0x7f, f3 = rvBits(x, 14, 12), f7 = x >>> 25;
+  const hit = Object.entries(RV_INS).find(([, [fmt, o, F3, F7]]) =>
+    o === op && (F3 === undefined || F3 === f3) &&
+    (fmt !== 'R' && fmt !== 'IS' || F7 === f7) && (fmt !== 'SYS' || F7 === x >>> 20));
+  if (!hit) return { fmt: 'X', layout: RV_LAYOUT.X, op };
+  const [name, [fmt]] = hit;
+  return { fmt, name, op, f3, f7, rd: rvBits(x, 11, 7), rs1: rvBits(x, 19, 15), rs2: rvBits(x, 24, 20), imm: rvImm(fmt, x),
+    layout: RV_LAYOUT[{ L: 'I', JR: 'I', F: 'I' }[fmt] || fmt] };
+}
+function rvLegend(r) {
+  const seen = new Set();
+  return r.layout.filter(f => !seen.has(f.role) && seen.add(f.role)).map(f => [f.role, f.role === 'rimm' ? 'immediate' : f.label])
+    .concat([['unused', 'Outside (B4–B7)']]);
+}
+
+function rvAsm(r, reg) {
+  const { fmt, name, rd, rs1, rs2, imm } = r;
+  const R = (n, role) => `<span class="c-${role}">${reg(n)}</span>`, I = v => `<span class="c-rimm">${v}</span>`;
+  const N = `<span class="c-rop">${name}</span>`;
+  switch (fmt) {
+    case 'R': return `${N} ${R(rd, 'rrd')}, ${R(rs1, 'rs1')}, ${R(rs2, 'rs2')}`;
+    case 'I': case 'IS': return `${N} ${R(rd, 'rrd')}, ${R(rs1, 'rs1')}, ${I(imm)}`;
+    case 'L': case 'JR': return `${N} ${R(rd, 'rrd')}, ${I(imm)}(${R(rs1, 'rs1')})`;
+    case 'S': return `${N} ${R(rs2, 'rs2')}, ${I(imm)}(${R(rs1, 'rs1')})`;
+    case 'B': return `${N} ${R(rs1, 'rs1')}, ${R(rs2, 'rs2')}, ${I(imm)}`;
+    case 'U': return `${N} ${R(rd, 'rrd')}, ${I('0x' + imm.toString(16))}`;
+    case 'J': return `${N} ${R(rd, 'rrd')}, ${I(imm)}`;
+    default: return N;
+  }
+}
+const rvX = n => `x${n}`, rvAbi = n => RV_REGS[n];
+const stripTags = h => h.replace(/<[^>]+>/g, '');
+
+function rvPseudo({ name, rd, rs1, rs2, imm }) {
+  const A = rvAbi;
+  if (name === 'addi' && rd === 0 && rs1 === 0 && imm === 0) return 'nop';
+  if (name === 'addi' && rs1 === 0) return `li ${A(rd)}, ${imm}`;
+  if (name === 'addi' && imm === 0) return `mv ${A(rd)}, ${A(rs1)}`;
+  if (name === 'xori' && imm === -1) return `not ${A(rd)}, ${A(rs1)}`;
+  if (name === 'sub' && rs1 === 0) return `neg ${A(rd)}, ${A(rs2)}`;
+  if (name === 'jal' && rd === 0) return `j ${imm}`;
+  if (name === 'jalr' && rd === 0 && rs1 === 1 && imm === 0) return 'ret';
+  if (name === 'beq' && rs2 === 0) return `beqz ${A(rs1)}, ${imm}`;
+  if (name === 'bne' && rs2 === 0) return `bnez ${A(rs1)}, ${imm}`;
+  return null;
+}
+
+const RV_SYM = { add: '+', sub: '−', xor: '^', or: '|', and: '&', sll: '<<', srl: '>>> (logical)', sra: '>> (arithmetic)', mul: '×',
+  div: '÷', divu: '÷ (unsigned)', rem: 'mod', remu: 'mod (unsigned)', addi: '+', xori: '^', ori: '|', andi: '&',
+  slli: '<<', srli: '>>> (logical)', srai: '>> (arithmetic)' };
+function rvMeaning(r) {
+  const { fmt, name, rd, rs1, rs2, imm } = r, A = rvAbi;
+  const dst = rd === 0 ? 'zero (result thrown away)' : A(rd);
+  const size = { lb: 'byte, sign-extended', lh: '16 bits, sign-extended', lw: '32 bits', lbu: 'byte, zero-extended', lhu: '16 bits, zero-extended', sb: 'low byte', sh: 'low 16 bits', sw: '32 bits' }[name];
+  if (name === 'slt' || name === 'sltu') return `${dst} = (${A(rs1)} < ${A(rs2)}) ? 1 : 0${name === 'sltu' ? ' — unsigned compare' : ''}`;
+  if (name === 'slti' || name === 'sltiu') return `${dst} = (${A(rs1)} < ${imm}) ? 1 : 0${name === 'sltiu' ? ' — unsigned compare' : ''}`;
+  if (name.startsWith('mulh')) return `${dst} = upper 32 bits of ${A(rs1)} × ${A(rs2)}`;
+  switch (fmt) {
+    case 'R': return `${dst} = ${A(rs1)} ${RV_SYM[name]} ${A(rs2)}`;
+    case 'I': case 'IS': return `${dst} = ${A(rs1)} ${RV_SYM[name]} ${imm}`;
+    case 'L': return `${dst} = memory[${A(rs1)} + ${imm}] (${size})`;
+    case 'S': return `memory[${A(rs1)} + ${imm}] = ${A(rs2)} (${size})`;
+    case 'B': return `if ${A(rs1)} ${{ beq: '==', bne: '≠', blt: '<', bge: '≥', bltu: '< (unsigned)', bgeu: '≥ (unsigned)' }[name]} ${A(rs2)}, jump ${imm} bytes (pc += ${imm})`;
+    case 'U': return name === 'lui' ? `${dst} = 0x${imm.toString(16)} << 12 = 0x${((imm << 12) >>> 0).toString(16).toUpperCase()}` : `${dst} = pc + (0x${imm.toString(16)} << 12)`;
+    case 'J': return `${dst} = pc + 4 (the return address), then jump ${imm} bytes`;
+    case 'JR': return `${dst} = pc + 4, then jump to ${A(rs1)} + ${imm}`;
+    case 'SYS': return name === 'ecall' ? 'Ask the operating system for a service (the system call number is in a7)' : 'Stop and hand control to the debugger';
+    case 'F': return 'Make earlier memory accesses visible before later ones (for threads and devices)';
+  }
+}
+
+function renderRv(d, src) {
+  const r = d.rv, x = rvRead();
+  const badge = $('rv-badge');
+  badge.className = 'badge ' + (r.fmt === 'X' ? 'k-bad' : r.fmt === 'C' ? 'k-inf' : 'k-ok');
+  badge.textContent = r.fmt === 'X' ? 'not an RV32IM instruction' : r.fmt === 'C' ? 'compressed (16-bit)' : `${RV_TYPE[r.fmt]}-type`;
+  $('rv-bar').innerHTML = r.layout.map(f => `<div style="width:calc(${f.hi - f.lo + 1} / 32 * 100%);background:${f.role === 'unused' ? 'var(--unused)' : `var(--c)`}" class="r-${f.role}" data-hl="${f.role}" title="${f.label}: bits ${f.hi}–${f.lo}">${f.hi - f.lo + 1 >= 5 ? f.label : ''}</div>`).join('');
+  if (r.name) {
+    $('rv-asm').innerHTML = rvAsm(r, rvAbi);
+    const pseudo = rvPseudo(r);
+    $('rv-alt').innerHTML = `${stripTags(rvAsm(r, rvX))}${pseudo ? ` · pseudo-instruction: <b>${pseudo}</b>` : ''}`;
+    $('rv-mean').textContent = rvMeaning(r);
+  } else {
+    $('rv-asm').innerHTML = `<span class="c-bad">.word 0x${x.toString(16).toUpperCase().padStart(8, '0')}</span>`;
+    $('rv-alt').textContent = r.fmt === 'C' ? 'The low two bits aren’t 11, so this starts a 16-bit compressed (RVC) instruction — not decoded here.' : `Opcode ${bin(r.op, 7)} with these funct bits isn’t a valid RV32IM instruction.`;
+    $('rv-mean').textContent = '';
+  }
+  const pseudo = r.name && rvPseudo(r);
+  setVal($('rv-in'), r.name ? (pseudo || stripTags(rvAsm(r, rvAbi))) : `.word 0x${x.toString(16).padStart(8, '0')}`, src);
+  const desc = f => {
+    const v = rvBits(x, f.hi, f.lo);
+    switch (f.role) {
+      case 'rop': return r.fmt === 'C' ? `${v} — not 11, so compressed` : `${RV_OPCODES[r.op] || 'unknown opcode'}`;
+      case 'rrd': case 'rs1': case 'rs2': return `x${v} = <b>${RV_REGS[v]}</b>`;
+      case 'rf3': return `${v}${r.name ? ` → <b>${r.name}</b>` : ''}`;
+      case 'rf7': return r.fmt === 'SYS' ? `${v} → <b>${r.name}</b>` : `${v}${r.name === 'sub' || r.name === 'sra' || r.name === 'srai' ? ' (bit 30 set: the subtract / arithmetic variant)' : r.f7 === 1 ? ' (multiply/divide extension)' : ''}`;
+      case 'rimm': {
+        if (r.fmt === 'I' || r.fmt === 'L' || r.fmt === 'JR') return `<b>${r.imm}</b> (sign-extended)`;
+        if (r.fmt === 'IS') return `shift by <b>${v}</b>`;
+        if (r.fmt === 'U') return `<b>0x${v.toString(16)}</b>`;
+        // S/B/J: say which immediate bits this piece carries
+        const map = RV_PIECES[r.fmt].find(p => p.hi === f.hi);
+        return map.parts.map(([h, l, dst]) => `<span class="c-rimm">${bin(rvBits(x, h, l), h - l + 1)}</span> → imm[${dst}]`).join(' · ');
+      }
+      default: return '';
+    }
+  };
+  let parts = r.layout.map(f => `<div class="part" data-hl="${f.role}"><div class="part-h"><span><i class="sw r-${f.role}"></i>${f.label}</span><em>bits ${f.hi}–${f.lo}</em></div><code class="pbits c-${f.role}">${bin(rvBits(x, f.hi, f.lo), f.hi - f.lo + 1)}</code><div class="pval">${desc(f)}</div></div>`).join('');
+  if (RV_PIECES[r.fmt]) {
+    const w = r.fmt === 'S' ? 12 : r.fmt === 'B' ? 13 : 21;
+    const order = { S: 'imm[11:5] imm[4:0]', B: 'imm[12] imm[11] imm[10:5] imm[4:1] + a final 0', J: 'imm[20] imm[19:12] imm[11] imm[10:1] + a final 0' }[r.fmt];
+    parts += `<div class="part" data-hl="rimm"><div class="part-h"><span><i class="sw r-rimm"></i>Immediate</span><em>the pieces above, in order · ${w} bits</em></div><code class="pbits c-rimm">${bin(BigInt.asUintN(w, BigInt(r.imm)), w)}</code><div class="pval">${order} = <b>${r.imm}</b>${r.fmt !== 'S' ? ' — the last bit is always 0 because instructions start on even addresses, so it isn’t stored' : ''}</div></div>`;
+  }
+  $('rv-parts').innerHTML = parts;
+  $('rv-hex').textContent = '0x' + x.toString(16).toUpperCase().padStart(8, '0');
+  $('rv-mem').textContent = `${[0, 1, 2, 3].map(i => hex2(u8[i])).join(' ')}  (B0 → B3: lowest byte first)`;
+}
+
+// ── assembler ──
+function rvReg(t) {
+  t = t.trim().toLowerCase();
+  const m = t.match(/^x(\d{1,2})$/);
+  if (m && +m[1] < 32) return +m[1];
+  if (t === 'fp') return 8;
+  const i = RV_REGS.indexOf(t);
+  if (i < 0) throw new Error(`Unknown register “${t}”`);
+  return i;
+}
+function rvNum(t, lo, hi, even) {
+  const v = parseIntText(t);
+  if (v === null) throw new Error('Missing number');
+  const n = Number(v);
+  if (n < lo || n > hi) throw new Error(`${n} is out of range (${lo} … ${hi})`);
+  if (even && n % 2) throw new Error('Branch and jump offsets must be even');
+  return n;
+}
+const rvEnc = {
+  R: (f7, rs2, rs1, f3, rd, op) => ((f7 << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | op) >>> 0,
+  I: (imm, rs1, f3, rd, op) => (((imm & 0xfff) << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | op) >>> 0,
+  S: (imm, rs2, rs1, f3, op) => ((((imm >> 5) & 0x7f) << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | ((imm & 0x1f) << 7) | op) >>> 0,
+  B: (imm, rs2, rs1, f3, op) => ((((imm >> 12) & 1) << 31) | (((imm >> 5) & 0x3f) << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | (((imm >> 1) & 0xf) << 8) | (((imm >> 11) & 1) << 7) | op) >>> 0,
+  U: (imm, rd, op) => (((imm & 0xfffff) << 12) | (rd << 7) | op) >>> 0,
+  J: (imm, rd, op) => ((((imm >> 20) & 1) << 31) | (((imm >> 1) & 0x3ff) << 21) | (((imm >> 11) & 1) << 20) | (((imm >> 12) & 0xff) << 12) | (rd << 7) | op) >>> 0,
+};
+function rvAssemble(src) {
+  const t = src.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!t) return null;
+  const sp = t.indexOf(' ');
+  const mn = sp < 0 ? t : t.slice(0, sp);
+  const a = sp < 0 ? [] : t.slice(sp + 1).split(',').map(x => x.trim()).filter(Boolean);
+  const need = (...ns) => { if (!ns.includes(a.length)) throw new Error(`${mn} takes ${ns.join(' or ')} operand${ns[0] === 1 ? '' : 's'}`); };
+  const mem = s => { const m = s.match(/^(.*)\((.+)\)$/); if (!m) throw new Error('Expected offset(register), e.g. 8(sp)'); return [m[1].trim() || '0', m[2]]; };
+  switch (mn) { // pseudo-instructions
+    case '.word': need(1); return Number(BigInt.asUintN(32, parseIntText(a[0])));
+    case 'nop': need(0); return rvAssemble('addi x0, x0, 0');
+    case 'ret': need(0); return rvAssemble('jalr x0, 0(x1)');
+    case 'li': need(2); rvNum(a[1], -2048, 2047); return rvAssemble(`addi ${a[0]}, x0, ${a[1]}`);
+    case 'mv': need(2); return rvAssemble(`addi ${a[0]}, ${a[1]}, 0`);
+    case 'not': need(2); return rvAssemble(`xori ${a[0]}, ${a[1]}, -1`);
+    case 'neg': need(2); return rvAssemble(`sub ${a[0]}, x0, ${a[1]}`);
+    case 'j': need(1); return rvAssemble(`jal x0, ${a[0]}`);
+    case 'beqz': need(2); return rvAssemble(`beq ${a[0]}, x0, ${a[1]}`);
+    case 'bnez': need(2); return rvAssemble(`bne ${a[0]}, x0, ${a[1]}`);
+  }
+  const def = RV_INS[mn];
+  if (!def) throw new Error(`Unknown instruction “${mn}”`);
+  const [fmt, op, f3 = 0, f7 = 0] = def;
+  switch (fmt) {
+    case 'R': need(3); return rvEnc.R(f7, rvReg(a[2]), rvReg(a[1]), f3, rvReg(a[0]), op);
+    case 'I': need(3); return rvEnc.I(rvNum(a[2], -2048, 2047), rvReg(a[1]), f3, rvReg(a[0]), op);
+    case 'IS': need(3); return rvEnc.R(f7, rvNum(a[2], 0, 31), rvReg(a[1]), f3, rvReg(a[0]), op);
+    case 'L': { need(2); const [o, r] = mem(a[1]); return rvEnc.I(rvNum(o, -2048, 2047), rvReg(r), f3, rvReg(a[0]), op); }
+    case 'S': { need(2); const [o, r] = mem(a[1]); return rvEnc.S(rvNum(o, -2048, 2047), rvReg(a[0]), rvReg(r), f3, op); }
+    case 'B': need(3); return rvEnc.B(rvNum(a[2], -4096, 4094, true), rvReg(a[1]), rvReg(a[0]), f3, op);
+    case 'U': need(2); return rvEnc.U(rvNum(a[1], -524288, 1048575), rvReg(a[0]), op);
+    case 'J': need(1, 2); return a.length === 1 ? rvEnc.J(rvNum(a[0], -1048576, 1048574, true), 1, op) : rvEnc.J(rvNum(a[1], -1048576, 1048574, true), rvReg(a[0]), op);
+    case 'JR': {
+      need(1, 2);
+      if (a.length === 1) return rvEnc.I(0, rvReg(a[0]), 0, 1, op);
+      const [o, r] = mem(a[1]);
+      return rvEnc.I(rvNum(o, -2048, 2047), rvReg(r), 0, rvReg(a[0]), op);
+    }
+    case 'SYS': need(0); return rvEnc.I(f7, 0, 0, 0, op);
+    case 'F': return 0x0ff0000f; // fence iorw, iorw
+  }
+}
+function rvPreset(asm) { u8.fill(0); rvWrite(rvAssemble(asm)); }
+
+function bindRv() {
+  bind('rv-in', rvAssemble, rvWrite);
+}
+
 /* ═══════════ Toolbar, presets, lens interaction ═══════════ */
 const OPS = {
   zero: () => u8.fill(0),
@@ -2189,6 +2466,18 @@ const PRESETS = [
     ['Now (local time)', () => { u8.fill(0); const d = new Date(); u32[0] = packFat(d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()); }, 'fat'],
     ['Last DOS time 2107-12-31 23:59:58', () => { u8.fill(0); u32[0] = packFat(2107, 12, 31, 23, 59, 58); }, 'fat'],
     ['All zeros (month 0 — invalid)', () => { u8.fill(0); }, 'fat'],
+  ]],
+  ['RISC-V', [
+    ['li a0, 42 (addi a0, zero, 42)', () => rvPreset('li a0, 42'), 'rv'],
+    ['add a0, a0, a1', () => rvPreset('add a0, a0, a1'), 'rv'],
+    ['mul a0, a0, a1', () => rvPreset('mul a0, a0, a1'), 'rv'],
+    ['lw a0, 8(sp)', () => rvPreset('lw a0, 8(sp)'), 'rv'],
+    ['sw ra, 12(sp)', () => rvPreset('sw ra, 12(sp)'), 'rv'],
+    ['beq a0, a1, -8 (loop back)', () => rvPreset('beq a0, a1, -8'), 'rv'],
+    ['jal ra, 2048 (function call)', () => rvPreset('jal ra, 2048'), 'rv'],
+    ['lui a0, 0x12345', () => rvPreset('lui a0, 0x12345'), 'rv'],
+    ['ret', () => rvPreset('ret'), 'rv'],
+    ['ecall (system call)', () => rvPreset('ecall'), 'rv'],
   ]],
   ['snowflake', [
     ['Discord docs example 175928847299117063', () => { u64[0] = 175928847299117063n; }, 'snow'],
@@ -2329,6 +2618,7 @@ buildPerm();
 bindPerm();
 bindSnow();
 bindFat();
+bindRv();
 setupControls();
 u64[0] = 0x0123456789ABCDEFn;
 update();

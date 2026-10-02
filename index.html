@@ -134,6 +134,7 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .r-oui { --c: var(--exp); } .r-nic { --c: var(--int); } .r-flag { --c: var(--sign); }
 .r-one { --c: var(--txt); } .r-lz { --c: var(--exp); } .r-tz { --c: var(--pay); }
 .r-frac { --c: var(--mant); }
+.r-pt { --c: var(--prefix); } .r-ps { --c: var(--sign); } .r-pu { --c: var(--exp); } .r-pg { --c: var(--mant); } .r-po { --c: var(--int); }
 
 /* hover-to-isolate a field's bits */
 .bytes[data-hl] .bit { opacity: .18; }
@@ -142,7 +143,8 @@ body[data-lens="varint"] .byte.in-varint::after { opacity: 1; }
 .bytes[data-hl="bad"] .r-bad, .bytes[data-hl="cont"] .r-cont, .bytes[data-hl="pay"] .r-pay,
 .bytes[data-hl="cr"] .r-cr, .bytes[data-hl="cg"] .r-cg, .bytes[data-hl="cb"] .r-cb, .bytes[data-hl="ca"] .r-ca,
 .bytes[data-hl="oui"] .r-oui, .bytes[data-hl="nic"] .r-nic, .bytes[data-hl="flag"] .r-flag,
-.bytes[data-hl="one"] .r-one, .bytes[data-hl="lz"] .r-lz, .bytes[data-hl="tz"] .r-tz, .bytes[data-hl="frac"] .r-frac { opacity: 1; }
+.bytes[data-hl="one"] .r-one, .bytes[data-hl="lz"] .r-lz, .bytes[data-hl="tz"] .r-tz, .bytes[data-hl="frac"] .r-frac,
+.bytes[data-hl="pt"] .r-pt, .bytes[data-hl="ps"] .r-ps, .bytes[data-hl="pu"] .r-pu, .bytes[data-hl="pg"] .r-pg, .bytes[data-hl="po"] .r-po { opacity: 1; }
 
 .stream-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .hexrow { display: flex; align-items: center; gap: 8px; flex: 1 1 300px; min-width: 0; }
@@ -240,6 +242,19 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--alpha); }
 .chans { display: flex; flex-wrap: wrap; gap: 2px 10px; font: 12px var(--mono); }
 .chans span { cursor: default; }
 .c64ch { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* bit fields deck */
+.c-pt { color: var(--prefix); } .c-ps { color: var(--sign); } .c-pu { color: var(--exp); } .c-pg { color: var(--mant); } .c-po { color: var(--int); }
+.permgrid { display: grid; grid-template-columns: auto repeat(3, minmax(44px, 64px)); gap: 6px 8px; align-items: center; margin: 4px 0 12px; }
+.permgrid .h { font-size: 11.5px; color: var(--muted); text-align: center; }
+.permgrid .rl { font-size: 12.5px; font-weight: 600; }
+.pbtn {
+  height: 32px; border-radius: 7px; cursor: pointer; font: 600 13px var(--mono);
+  border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); background: color-mix(in srgb, var(--c) 10%, transparent);
+  color: color-mix(in srgb, var(--c) 60%, var(--muted));
+}
+.pbtn.on { background: var(--c); border-color: var(--c); color: #0a0d13; }
+.lsline { font: 600 22px/1.3 var(--mono); letter-spacing: .04em; }
 
 /* fixed-point deck */
 .c-frac { color: var(--mant); }
@@ -351,6 +366,7 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
         <button role="tab" data-tab="time">Time</button>
         <button role="tab" data-tab="net">Network</button>
         <button role="tab" data-tab="bits">Bits</button>
+        <button role="tab" data-tab="fields">Fields</button>
         <button role="tab" data-tab="color">Color</button>
       </div>
       <div class="seg" id="viewSeg" title="Show only the cards for the current lens, or every card">
@@ -535,6 +551,27 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
       </div>
     </section>
 
+    <!-- Bit fields -->
+    <section class="deck" data-deck="fields">
+      <div class="deck-h"><h2>Bit fields</h2><p>One number carved into named groups of bits</p></div>
+      <div class="pair">
+        <article class="card" data-lens="perm">
+          <div class="card-h"><h3>Unix file mode</h3><span class="tag">16-bit <code>st_mode</code> · bytes B0–B1</span><span class="badge" id="perm-badge"></span></div>
+          <div class="when"><div class="lsline" id="perm-ls"></div><div class="pval" id="perm-desc"></div></div>
+          <div class="fields">
+            <label class="field"><span class="lab">Mode (octal like 755 / 4755, or rwxr-xr-x)</span><input type="text" id="perm-in" spellcheck="false" autocomplete="off"><small class="msg"></small></label>
+            <label class="field"><span class="lab">File type (top 4 bits)</span><select class="btn" id="perm-type"></select><small class="msg"></small></label>
+          </div>
+          <div class="permgrid" id="perm-grid"></div>
+          <div class="kv">
+            <span>Command</span><code id="perm-cmd"></code>
+            <span>Full st_mode</span><code id="perm-full"></code>
+          </div>
+          <p class="hint">Each octal digit is exactly three bits — r = 4, w = 2, x = 1 — which is why permissions are written in octal: 7 = rwx, 5 = r-x, 4 = r--. The leading digit holds the special bits: setuid (4, run as the file’s owner, e.g. <code>passwd</code>), setgid (2) and sticky (1, on <code>/tmp</code>: only a file’s owner may delete it).</p>
+        </article>
+      </div>
+    </section>
+
     <!-- Color -->
     <section class="deck" data-deck="color">
       <div class="deck-h"><h2>Color</h2><p>Packed pixel formats · swatches follow the byte order of the grid above</p></div>
@@ -598,8 +635,8 @@ const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 const state = { lens: 'i64', order: 'be', view: 'all', hl: null };
 const DECK_OF = { f32: 'float', f64: 'float', f16: 'float', bf16: 'float', i32: 'int', i64: 'int', text: 'text', varint: 'varint', c32: 'color', c64: 'color', c565: 'color' };
-const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed' };
-Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed' });
+const TAB_OF = { c32: 'color', c64: 'color', c565: 'color', t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields' };
+Object.assign(DECK_OF, { t32: 'time', t64: 'time', ip4: 'net', mac: 'net', b64: 'bits', b32: 'bits', q16: 'fixed', q15: 'fixed', perm: 'fields' });
 Object.assign(state, { colorLayout: 'RGBA', c64mode: 'u16' });
 // display position → memory byte index; 'be' shows the MSB first, 'le' the LSB first, on any host
 const displayOrder = () => (state.order === 'le') === LITTLE ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -760,6 +797,7 @@ const ROLE_NAMES = {
   prefix: 'UTF-8 marker', bad: 'invalid UTF-8', cont: 'continuation flag', pay: 'varint payload', unused: 'not in view',
   cr: 'red', cg: 'green', cb: 'blue', ca: 'alpha', oui: 'OUI (vendor)', nic: 'device-specific', flag: 'MAC flag bit',
   one: 'set bit', lz: 'leading zero', tz: 'trailing zero', frac: 'fraction bit',
+  pt: 'file type', ps: 'special bit', pu: 'owner permission', pg: 'group permission', po: 'others permission',
 };
 const LEGENDS = {
   f32: [['sign', 'Sign'], ['exp', 'Exponent (8)'], ['mant', 'Mantissa (23)'], ['unused', 'Outside f32 (B4–B7)']],
@@ -781,6 +819,7 @@ const LEGENDS = {
   b32: [['one', 'Set bits (1s)'], ['lz', 'Leading zeros'], ['tz', 'Trailing zeros'], ['unused', 'Other zeros · outside (B4–B7)']],
   q16: [['sign', 'Sign'], ['int', 'Integer part (15)'], ['frac', 'Fraction (16)'], ['unused', 'Outside (B4–B7)']],
   q15: [['sign', 'Sign'], ['frac', 'Fraction (15)'], ['unused', 'Outside (B2–B7)']],
+  perm: [['pt', 'File type (4)'], ['ps', 'setuid · setgid · sticky'], ['pu', 'Owner rwx'], ['pg', 'Group rwx'], ['po', 'Others rwx'], ['unused', 'Outside (B2–B7)']],
 };
 
 // position of (byte b, bit k) inside an n-byte native-endian number
@@ -802,6 +841,11 @@ function roleOf(b, k, d) {
     case 't64': return valueBit(b, k, 8) === 63 ? 'sign' : 'int';
     case 'ip4': return b < 4 ? 'int' : 'unused';
     case 'mac': return b >= 6 ? 'unused' : b >= 3 ? 'nic' : b === 0 && k < 2 ? 'flag' : 'oui';
+    case 'perm': {
+      if (b >= 2) return 'unused';
+      const v = valueBit(b, k, 2);
+      return v >= 12 ? 'pt' : v >= 9 ? 'ps' : v >= 6 ? 'pu' : v >= 3 ? 'pg' : 'po';
+    }
     case 'q16': case 'q15': {
       const q = QFMT[state.lens], n = q.bits / 8;
       if (b >= n) return 'unused';
@@ -840,6 +884,7 @@ function byteNote(b, d) {
     case 'b64': return range(8);
     case 'q16': return b < 4 ? range(4) : '—';
     case 'q15': return b < 2 ? range(2) : '—';
+    case 'perm': return b < 2 ? range(2) : '—';
     case 'b32': return b < 4 ? range(4) : '—';
   }
 }
@@ -1226,6 +1271,7 @@ function update(src = null) {
   renderBits(d);
   renderFixed('q16', src);
   renderFixed('q15', src);
+  renderPerm(src);
   renderLens();
 }
 
@@ -1794,6 +1840,82 @@ function bindFixed() {
   }
 }
 
+/* ═══════════ Unix file mode ═══════════ */
+const FILE_TYPES = [
+  [0o10, '-', 'regular file'], [0o04, 'd', 'directory'], [0o12, 'l', 'symbolic link'], [0o02, 'c', 'character device'],
+  [0o06, 'b', 'block device'], [0o01, 'p', 'named pipe (FIFO)'], [0o14, 's', 'socket'], [0, '?', 'no type (plain permission bits)'],
+];
+const PERM_CLASSES = [['Owner', 'pu', 6], ['Group', 'pg', 3], ['Others', 'po', 0]];
+
+function lsString(mode) {
+  const ft = FILE_TYPES.find(t => t[0] === mode >> 12);
+  let str = ft ? ft[1] : '?';
+  const special = [[11, 's'], [10, 's'], [9, 't']];
+  PERM_CLASSES.forEach(([, , sh], i) => {
+    str += mode & (4 << sh) ? 'r' : '-';
+    str += mode & (2 << sh) ? 'w' : '-';
+    const x = mode & (1 << sh), sp = mode & (1 << special[i][0]), ch = special[i][1];
+    str += sp ? (x ? ch : ch.toUpperCase()) : (x ? 'x' : '-');
+  });
+  return str;
+}
+
+function buildPerm() {
+  $('perm-type').innerHTML = FILE_TYPES.map(([v, c, n]) => `<option value="${v}">${c}  ${n}</option>`).join('');
+  const cell = (bit, role, label) => `<button type="button" class="pbtn r-${role}" data-pbit="${bit}" data-hl="${role}" title="bit ${bit} (octal ${(1 << bit).toString(8)})">${label}</button>`;
+  $('perm-grid').innerHTML =
+    `<span></span><span class="h">read (4)</span><span class="h">write (2)</span><span class="h">exec (1)</span>` +
+    PERM_CLASSES.map(([name, role, sh]) => `<span class="rl c-${role}">${name}</span>${cell(sh + 2, role, 'r')}${cell(sh + 1, role, 'w')}${cell(sh, role, 'x')}`).join('') +
+    `<span class="rl c-ps">Special</span>${cell(11, 'ps', 'suid')}${cell(10, 'ps', 'sgid')}${cell(9, 'ps', 'sticky')}`;
+}
+
+function renderPerm(src) {
+  const mode = u16[0], perms = mode & 0o7777, type = mode >> 12;
+  const ft = FILE_TYPES.find(t => t[0] === type);
+  const ls = lsString(mode);
+  $('perm-ls').innerHTML = `<span class="c-pt">${ls[0]}</span><span class="c-pu">${ls.slice(1, 4)}</span><span class="c-pg">${ls.slice(4, 7)}</span><span class="c-po">${ls.slice(7)}</span>`;
+  const words = sh => ['read', 'write', 'execute'].filter((_, i) => mode & (4 >> i << sh)).join(', ') || 'nothing';
+  $('perm-desc').textContent = PERM_CLASSES.map(([n, , sh]) => `${n}: ${words(sh)}`).join(' · ');
+  const badge = $('perm-badge');
+  badge.className = 'badge ' + (ft ? 'k-ok' : 'k-bad');
+  badge.textContent = ft ? ft[2] : `unknown type ${type.toString(8)}`;
+  setVal($('perm-in'), perms.toString(8).padStart(perms > 0o777 ? 4 : 3, '0'), src);
+  $('perm-type').value = ft ? ft[0] : '';
+  document.querySelectorAll('#perm-grid [data-pbit]').forEach(b => b.classList.toggle('on', !!(mode & (1 << b.dataset.pbit))));
+  $('perm-cmd').textContent = `chmod ${perms.toString(8).padStart(3, '0')} file`;
+  $('perm-full').textContent = `0o${mode.toString(8).padStart(6, '0')} = 0x${mode.toString(16).toUpperCase().padStart(4, '0')}`;
+}
+
+function bindPerm() {
+  bind('perm-in', s => {
+    const t = s.trim();
+    if (!t) return null;
+    const sym = t.match(/^([-dlcbps?])?([r-][w-][xsS-][r-][w-][xsS-][r-][w-][xtT-])$/);
+    if (sym) {
+      const [, tc, p] = sym;
+      let m = 0;
+      [...p].forEach((c, i) => {
+        const sh = 8 - i;
+        if (c !== '-' && !'ST'.includes(c)) m |= 1 << sh;
+        if ('sS'.includes(c)) m |= 1 << (i === 2 ? 11 : 10);
+        if ('tT'.includes(c)) m |= 1 << 9;
+      });
+      const ft = tc && FILE_TYPES.find(f => f[1] === tc);
+      return { perms: m, type: ft ? ft[0] : null };
+    }
+    const o = t.replace(/^0o/i, '').replace(/^0+(?=[0-7])/, '');
+    if (!/^[0-7]{1,6}$/.test(o)) throw new Error('Expected octal digits (e.g. 755) or a string like rwxr-xr-x');
+    const n = parseInt(o, 8);
+    if (n > 0xFFFF) throw new Error('At most 16 bits (0o177777)');
+    return n > 0o7777 ? { perms: n & 0o7777, type: n >> 12 } : { perms: n, type: null };
+  }, ({ perms, type }) => { u16[0] = ((type ?? (u16[0] >> 12)) << 12) | perms; });
+  $('perm-type').addEventListener('change', e => { u16[0] = (Number(e.target.value) << 12) | (u16[0] & 0o7777); update(); });
+  $('perm-grid').addEventListener('click', e => {
+    const t = e.target.closest('[data-pbit]');
+    if (t) { u16[0] ^= 1 << t.dataset.pbit; update(); }
+  });
+}
+
 /* ═══════════ Toolbar, presets, lens interaction ═══════════ */
 const OPS = {
   zero: () => u8.fill(0),
@@ -1897,6 +2019,15 @@ const PRESETS = [
     ['u64 power of two: 2⁴⁰', () => { u64[0] = 1n << 40n; }, 'b64'],
     ['u64 0b101000 (40): 3 trailing zeros', () => { u64[0] = 40n; }, 'b64'],
   ]],
+  ['permissions', [
+    ['-rwxr-xr-x 755 (program)', () => { u8.fill(0); u16[0] = 0o100755; }, 'perm'],
+    ['-rw-r--r-- 644 (ordinary file)', () => { u8.fill(0); u16[0] = 0o100644; }, 'perm'],
+    ['-rw------- 600 (SSH private key)', () => { u8.fill(0); u16[0] = 0o100600; }, 'perm'],
+    ['drwxr-xr-x 755 (directory)', () => { u8.fill(0); u16[0] = 0o040755; }, 'perm'],
+    ['drwxrwxrwt 1777 (/tmp, sticky)', () => { u8.fill(0); u16[0] = 0o041777; }, 'perm'],
+    ['-rwsr-xr-x 4755 (passwd, setuid)', () => { u8.fill(0); u16[0] = 0o104755; }, 'perm'],
+    ['lrwxrwxrwx 777 (symlink)', () => { u8.fill(0); u16[0] = 0o120777; }, 'perm'],
+  ]],
   ['color', [
     ['RGBA: orange + half-transparent teal', () => { state.colorLayout = 'RGBA'; u32[0] = 0xFF8C1AFF; u32[1] = 0x1ABC9C80; }, 'c32'],
     ['Canvas bytes R,G,B,A (read as ABGR)', () => { state.colorLayout = 'ABGR'; writeBytes([0xFF, 0x8C, 0x1A, 0xFF, 0x1A, 0xBC, 0x9C, 0x80]); }, 'c32'],
@@ -1930,7 +2061,7 @@ function setupControls() {
   $('tabs').addEventListener('click', e => {
     const t = e.target.closest('[data-tab]');
     if (!t) return;
-    state.lens = { color: 'c32', time: 't32', net: 'ip4', bits: 'b32', fixed: 'q16' }[t.dataset.tab] || t.dataset.tab;
+    state.lens = { color: 'c32', time: 't32', net: 'ip4', bits: 'b32', fixed: 'q16', fields: 'perm' }[t.dataset.tab] || t.dataset.tab;
     renderLens();
   });
 
@@ -2012,6 +2143,8 @@ bindTime();
 bindNet();
 bindBits();
 bindFixed();
+buildPerm();
+bindPerm();
 setupControls();
 u64[0] = 0x0123456789ABCDEFn;
 update();

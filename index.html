@@ -387,9 +387,9 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
         <button role="tab" data-tab="varint">Varint</button>
         <button role="tab" data-tab="time">Time</button>
         <button role="tab" data-tab="net">Network</button>
-        <button role="tab" data-tab="bits">Bits</button>
         <button role="tab" data-tab="fields">Fields</button>
         <button role="tab" data-tab="color">Color</button>
+        <button role="tab" data-tab="bits">Tricks</button>
       </div>
       <div class="seg" id="viewSeg" title="Show only the cards for the current lens, or every card">
         <button type="button" data-view="all" class="on">All</button>
@@ -565,15 +565,6 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
       </div>
     </section>
 
-    <!-- Bits -->
-    <section class="deck" data-deck="bits">
-      <div class="deck-h"><h2>Bit stats &amp; tricks</h2><p>Counting and manipulating bits — the operations behind hash tables, allocators and chess engines</p></div>
-      <div class="pair">
-        <article class="card" data-lens="b32" id="card-b32"></article>
-        <article class="card" data-lens="b64" id="card-b64"></article>
-      </div>
-    </section>
-
     <!-- Bit fields -->
     <section class="deck" data-deck="fields">
       <div class="deck-h"><h2>Bit fields</h2><p>One number carved into named groups of bits</p></div>
@@ -678,6 +669,15 @@ footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
           <div class="card-h"><h3>4 × 16-bit RGB565</h3><span class="tag">5 red · 6 green · 5 blue — green gets the extra bit because eyes are most sensitive to it</span></div>
           <div class="swatches sw565" id="c565-slots"></div>
         </article>
+      </div>
+    </section>
+
+    <!-- Bits -->
+    <section class="deck" data-deck="bits">
+      <div class="deck-h"><h2>Bit stats &amp; tricks</h2><p>Counting and manipulating bits — the operations behind hash tables, allocators and chess engines</p></div>
+      <div class="pair">
+        <article class="card" data-lens="b32" id="card-b32"></article>
+        <article class="card" data-lens="b64" id="card-b64"></article>
       </div>
     </section>
   </main>
@@ -2446,12 +2446,6 @@ const PRESETS = [
     ['MAC Docker container 02:42:ac:11:00:02', () => { u8.fill(0); u8.set([0x02, 0x42, 0xac, 0x11, 0x00, 0x02]); }, 'mac'],
     ['MAC mDNS multicast 01:00:5e:00:00:fb', () => { u8.fill(0); u8.set([0x01, 0x00, 0x5e, 0x00, 0x00, 0xfb]); }, 'mac'],
   ]],
-  ['bits', [
-    ['u32 0x00FF0000 (middle byte)', () => { u8.fill(0); u32[0] = 0x00FF0000; }, 'b32'],
-    ['u32 0xF0F0F0F0 (popcount 16)', () => { u8.fill(0); u32[0] = 0xF0F0F0F0; }, 'b32'],
-    ['u64 power of two: 2⁴⁰', () => { u64[0] = 1n << 40n; }, 'b64'],
-    ['u64 0b101000 (40): 3 trailing zeros', () => { u64[0] = 40n; }, 'b64'],
-  ]],
   ['permissions', [
     ['-rwxr-xr-x 755 (program)', () => { u8.fill(0); u16[0] = 0o100755; }, 'perm'],
     ['-rw-r--r-- 644 (ordinary file)', () => { u8.fill(0); u16[0] = 0o100644; }, 'perm'],
@@ -2490,6 +2484,12 @@ const PRESETS = [
     ['RGB565: red, green, blue, white', () => { u16[0] = 0xF800; u16[1] = 0x07E0; u16[2] = 0x001F; u16[3] = 0xFFFF; }, 'c565'],
     ['RGBA16: 50% gray', () => { state.c64mode = 'u16'; pack64({ R: 0x8000, G: 0x8000, B: 0x8000, A: 0xFFFF }); }, 'c64'],
     ['RGBA16F: HDR orange (red = 4.0)', () => { state.c64mode = 'f16'; pack64({ R: toHalf(4), G: toHalf(0.5), B: toHalf(0.05), A: toHalf(1) }); }, 'c64'],
+  ]],
+  ['tricks', [
+    ['u32 0x00FF0000 (middle byte)', () => { u8.fill(0); u32[0] = 0x00FF0000; }, 'b32'],
+    ['u32 0xF0F0F0F0 (popcount 16)', () => { u8.fill(0); u32[0] = 0xF0F0F0F0; }, 'b32'],
+    ['u64 power of two: 2⁴⁰', () => { u64[0] = 1n << 40n; }, 'b64'],
+    ['u64 0b101000 (40): 3 trailing zeros', () => { u64[0] = 40n; }, 'b64'],
   ]],
 ];
 

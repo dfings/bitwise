@@ -2793,6 +2793,8 @@ function syncViewSeg() {
 }
 
 /* ═══════════ Boot ═══════════ */
+// A refresh is a clean restart (default value and lens), so start at the top rather than a restored scroll position.
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 // small screens (where the full header isn't pinned) start focused on one deck
 if (matchMedia('(max-width: 699px), (max-height: 599px)').matches) state.view = 'focus';
 syncViewSeg();

@@ -46,6 +46,9 @@ body {
   color: var(--text);
   font: 14px/1.45 var(--sans);
 }
+/* Hide the half-built page until the script's first render; the animation reveals it anyway if the script fails. */
+body.booting .wrap { visibility: hidden; animation: reveal 0s 1s forwards; }
+@keyframes reveal { to { visibility: visible; } }
 code, input, .mono { font-family: var(--mono); }
 button, select, input { font: inherit; color: inherit; }
 
@@ -376,7 +379,7 @@ tr[data-bytes]:hover td { background: var(--panel-2); }
 footer { color: var(--faint); font-size: 12px; padding: 0 0 30px; }
 </style>
 </head>
-<body data-lens="i64" data-view="all">
+<body data-lens="i64" data-view="all" class="booting">
 <div class="wrap">
   <div class="dock" id="dock">
   <header>
@@ -1388,6 +1391,9 @@ function renderHexAll(src) {
 function derive() { return { utf8: decodeUtf8(u8), varint: decodeVarint(u8), b64: bitInfo(u64[0], 64), b32: bitInfo(BigInt(u32[0]), 32), rv: rvDecode(rvRead()), utf16: decodeUtf16(), b64len: usedEnd() }; }
 
 function update(src = null) {
+  // Cards above the control being used can change height (e.g. the RISC-V card when B0–B3 change).
+  // Keep that control fixed on screen so a slider doesn't jump out from under the pointer.
+  const anchorTop = src && src.isConnected ? src.getBoundingClientRect().top : null;
   const d = derive();
   renderHexAll(src);
   renderFloat('f32', src);
@@ -1411,6 +1417,10 @@ function update(src = null) {
   renderFat(src);
   renderRv(d, src);
   renderLens();
+  if (anchorTop !== null) {
+    const shift = src.getBoundingClientRect().top - anchorTop;
+    if (shift) window.scrollBy(0, shift);
+  }
 }
 
 /* ═══════════ Input → buffer bindings ═══════════ */
@@ -2817,6 +2827,7 @@ bindRv();
 setupControls();
 u64[0] = 0x0123456789ABCDEFn;
 update();
+document.body.classList.remove('booting');
 </script>
 </body>
 </html>
